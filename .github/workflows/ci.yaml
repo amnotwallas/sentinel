@@ -1,0 +1,95 @@
+name: checks
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: sentinel_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      SENTINEL_DATABASE_URL: postgresql+psycopg://sentinel:ci-only@127.0.0.1:5432/sentinel_test
+      SENTINEL_TEST_DATABASE_URL: postgresql+psycopg://sentinel:ci-only@127.0.0.1:5432/sentinel_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.7"
+      - run: uv sync --project backend --frozen
+      - run: uv run --project backend ruff check backend
+      - run: uv run --project backend ruff format --check backend
+      - run: uv run mypy
+        working-directory: backend
+      - run: uv run --project backend alembic -c backend/alembic.ini upgrade head
+      - run: uv run --project backend alembic -c backend/alembic.ini check
+      - run: uv run --project backend pytest backend/tests
+      - name: Verify migration downgrade and re-upgrade (disposable database)
+        run: |
+          uv run --project backend alembic -c backend/alembic.ini downgrade base
+          uv run --project backend alembic -c backend/alembic.ini upgrade head
+          uv run --project backend alembic -c backend/alembic.ini check
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.7"
+      - run: uv sync --project ../backend --frozen
+      - run: npm ci
+      - name: Verify OpenAPI and generated client drift
+        run: |
+          ../backend/.venv/bin/python -m sentinel.api.export openapi.json
+          npm run api:generate
+          git diff --exit-code -- openapi.json src/shared/api/generated/schema.ts
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  compose:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: compose-ci-only
+      SENTINEL_API_TOKEN: compose-ci-only-token
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f infra/compose.yaml config --quiet
+      - run: docker compose -f infra/compose.yaml config --format json | python3 infra/check_bindings.py
+      - run: docker compose -f infra/compose.yaml up -d --wait postgres
+      - run: docker compose -f infra/compose.yaml run --build --rm api alembic upgrade head
+      - run: docker compose -f infra/compose.yaml up -d --build --wait --wait-timeout 180
+      - run: docker compose -f infra/compose.yaml exec -T api python -m sentinel.worker.smoke
+      - name: Verify Tempo outage does not remove API readiness
+        run: |
+          docker compose -f infra/compose.yaml stop tempo
+          python3 -c "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health/ready')); assert r['status']=='ready' and r['tempo']=='unavailable'"
+      - name: Diagnostic logs
+        if: failure()
+        run: docker compose -f infra/compose.yaml logs
+      - name: Stop disposable CI stack
+        if: always()
+        run: docker compose -f infra/compose.yaml down
