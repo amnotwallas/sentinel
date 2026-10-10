@@ -1,12 +1,59 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class ProjectRow(Base):
+    __tablename__ = "projects"
+    __table_args__ = (
+        CheckConstraint("state_version BETWEEN 1 AND 2147483647", name="project_state_version"),
+        Index(
+            "uq_projects_live_name",
+            "name",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index("ix_projects_list", "created_at", "id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    state_version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChangeEventRow(Base):
+    __tablename__ = "change_events"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('environment_created','environment_updated','test_case_created',"
+            "'test_case_revised','suite_created','suite_revised','baseline_activated')",
+            name="change_event_kind",
+        ),
+        CheckConstraint(
+            "subject_type IN ('environment','test_case','suite','baseline')",
+            name="change_event_subject_type",
+        ),
+        Index("ix_change_events_project_time", "project_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"))
+    kind: Mapped[str] = mapped_column(String(32))
+    subject_type: Mapped[str] = mapped_column(String(16))
+    subject_id: Mapped[UUID]
+    before_ref: Mapped[UUID | None]
+    after_ref: Mapped[UUID | None]
+    summary: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ExecutionRow(Base):
