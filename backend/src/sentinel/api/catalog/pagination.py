@@ -84,6 +84,8 @@ def decode_project_cursor(value: str) -> tuple[datetime, UUID]:
         if not isinstance(created_text, str) or not isinstance(id_text, str):
             raise CursorInvalid
         created_at = datetime.strptime(created_text, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
+        if _timestamp(created_at) != created_text:
+            raise CursorInvalid
         project_id = UUID(id_text)
         if str(project_id) != id_text or project_id.int == 0:
             raise CursorInvalid

@@ -60,6 +60,287 @@
       },
       "Problem": {
         "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "code": {
+                "const": "validation_failed"
+              },
+              "status": {
+                "const": 422
+              },
+              "title": {
+                "const": "Request validation failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:validation_failed"
+              }
+            }
+          },
+          {
+            "properties": {
+              "code": {
+                "const": "secret_reference_invalid"
+              },
+              "status": {
+                "const": 422
+              },
+              "title": {
+                "const": "Secret reference invalid"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:secret_reference_invalid"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "resource_not_found"
+              },
+              "status": {
+                "const": 404
+              },
+              "title": {
+                "const": "Request failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:resource_not_found"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "revision_conflict"
+              },
+              "status": {
+                "const": 412
+              },
+              "title": {
+                "const": "Revision conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:revision_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "revision_precondition_required"
+              },
+              "status": {
+                "const": 428
+              },
+              "title": {
+                "const": "Revision precondition required"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:revision_precondition_required"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "resource_conflict"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Resource conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:resource_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "request_too_large"
+              },
+              "status": {
+                "const": 413
+              },
+              "title": {
+                "const": "Request too large"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:request_too_large"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "unsupported_media_type"
+              },
+              "status": {
+                "const": 415
+              },
+              "title": {
+                "const": "Unsupported media type"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:unsupported_media_type"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "authentication_required"
+              },
+              "status": {
+                "const": 401
+              },
+              "title": {
+                "const": "Authentication required"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:authentication_required"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "forbidden_origin"
+              },
+              "status": {
+                "const": 403
+              },
+              "title": {
+                "const": "Forbidden origin"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:forbidden_origin"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "idempotency_conflict"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Idempotency conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:idempotency_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "baseline_ineligible"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Baseline ineligible"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:baseline_ineligible"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "baseline_incompatible"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Baseline incompatible"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:baseline_incompatible"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "internal_error"
+              },
+              "status": {
+                "const": 500
+              },
+              "title": {
+                "const": "Internal server error"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:internal_error"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "http_error"
+              },
+              "status": {
+                "const": 405
+              },
+              "title": {
+                "const": "Request failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:http_error"
+              }
+            }
+          }
+        ],
         "properties": {
           "code": {
             "enum": [

@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -42,6 +42,42 @@ ProblemCode = Literal[
     "http_error",
 ]
 
+_PROBLEM_DEFINITIONS: dict[str, tuple[int, str]] = {
+    "validation_failed": (422, "Request validation failed"),
+    "secret_reference_invalid": (422, "Secret reference invalid"),
+    "resource_not_found": (404, "Request failed"),
+    "revision_conflict": (412, "Revision conflict"),
+    "revision_precondition_required": (428, "Revision precondition required"),
+    "resource_conflict": (409, "Resource conflict"),
+    "request_too_large": (413, "Request too large"),
+    "unsupported_media_type": (415, "Unsupported media type"),
+    "authentication_required": (401, "Authentication required"),
+    "forbidden_origin": (403, "Forbidden origin"),
+    "idempotency_conflict": (409, "Idempotency conflict"),
+    "baseline_ineligible": (409, "Baseline ineligible"),
+    "baseline_incompatible": (409, "Baseline incompatible"),
+    "internal_error": (500, "Internal server error"),
+    "http_error": (405, "Request failed"),
+}
+_VALIDATION_PROBLEMS = {"validation_failed", "secret_reference_invalid"}
+
+
+def _add_problem_variants(schema: dict[str, Any]) -> None:
+    variants: list[dict[str, Any]] = []
+    for code, (status, title) in _PROBLEM_DEFINITIONS.items():
+        variant: dict[str, Any] = {
+            "properties": {
+                "code": {"const": code},
+                "status": {"const": status},
+                "title": {"const": title},
+                "type": {"const": f"urn:sentinel:problem:{code}"},
+            }
+        }
+        if code not in _VALIDATION_PROBLEMS:
+            variant["not"] = {"required": ["errors"]}
+        variants.append(variant)
+    schema["oneOf"] = variants
+
 
 class FieldError(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -53,7 +89,7 @@ class FieldError(BaseModel):
 
 
 class Problem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_add_problem_variants)
 
     type: str = Field(min_length=1, max_length=128)
     title: str = Field(min_length=1, max_length=120)

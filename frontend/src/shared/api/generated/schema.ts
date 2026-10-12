@@ -118,7 +118,142 @@ export interface components {
             title: string;
             /** Type */
             type: string;
-        };
+        } & ({
+            /** @constant */
+            code?: "validation_failed";
+            /** @constant */
+            status?: 422;
+            /** @constant */
+            title?: "Request validation failed";
+            /** @constant */
+            type?: "urn:sentinel:problem:validation_failed";
+        } | {
+            /** @constant */
+            code?: "secret_reference_invalid";
+            /** @constant */
+            status?: 422;
+            /** @constant */
+            title?: "Secret reference invalid";
+            /** @constant */
+            type?: "urn:sentinel:problem:secret_reference_invalid";
+        } | {
+            /** @constant */
+            code?: "resource_not_found";
+            /** @constant */
+            status?: 404;
+            /** @constant */
+            title?: "Request failed";
+            /** @constant */
+            type?: "urn:sentinel:problem:resource_not_found";
+        } | {
+            /** @constant */
+            code?: "revision_conflict";
+            /** @constant */
+            status?: 412;
+            /** @constant */
+            title?: "Revision conflict";
+            /** @constant */
+            type?: "urn:sentinel:problem:revision_conflict";
+        } | {
+            /** @constant */
+            code?: "revision_precondition_required";
+            /** @constant */
+            status?: 428;
+            /** @constant */
+            title?: "Revision precondition required";
+            /** @constant */
+            type?: "urn:sentinel:problem:revision_precondition_required";
+        } | {
+            /** @constant */
+            code?: "resource_conflict";
+            /** @constant */
+            status?: 409;
+            /** @constant */
+            title?: "Resource conflict";
+            /** @constant */
+            type?: "urn:sentinel:problem:resource_conflict";
+        } | {
+            /** @constant */
+            code?: "request_too_large";
+            /** @constant */
+            status?: 413;
+            /** @constant */
+            title?: "Request too large";
+            /** @constant */
+            type?: "urn:sentinel:problem:request_too_large";
+        } | {
+            /** @constant */
+            code?: "unsupported_media_type";
+            /** @constant */
+            status?: 415;
+            /** @constant */
+            title?: "Unsupported media type";
+            /** @constant */
+            type?: "urn:sentinel:problem:unsupported_media_type";
+        } | {
+            /** @constant */
+            code?: "authentication_required";
+            /** @constant */
+            status?: 401;
+            /** @constant */
+            title?: "Authentication required";
+            /** @constant */
+            type?: "urn:sentinel:problem:authentication_required";
+        } | {
+            /** @constant */
+            code?: "forbidden_origin";
+            /** @constant */
+            status?: 403;
+            /** @constant */
+            title?: "Forbidden origin";
+            /** @constant */
+            type?: "urn:sentinel:problem:forbidden_origin";
+        } | {
+            /** @constant */
+            code?: "idempotency_conflict";
+            /** @constant */
+            status?: 409;
+            /** @constant */
+            title?: "Idempotency conflict";
+            /** @constant */
+            type?: "urn:sentinel:problem:idempotency_conflict";
+        } | {
+            /** @constant */
+            code?: "baseline_ineligible";
+            /** @constant */
+            status?: 409;
+            /** @constant */
+            title?: "Baseline ineligible";
+            /** @constant */
+            type?: "urn:sentinel:problem:baseline_ineligible";
+        } | {
+            /** @constant */
+            code?: "baseline_incompatible";
+            /** @constant */
+            status?: 409;
+            /** @constant */
+            title?: "Baseline incompatible";
+            /** @constant */
+            type?: "urn:sentinel:problem:baseline_incompatible";
+        } | {
+            /** @constant */
+            code?: "internal_error";
+            /** @constant */
+            status?: 500;
+            /** @constant */
+            title?: "Internal server error";
+            /** @constant */
+            type?: "urn:sentinel:problem:internal_error";
+        } | {
+            /** @constant */
+            code?: "http_error";
+            /** @constant */
+            status?: 405;
+            /** @constant */
+            title?: "Request failed";
+            /** @constant */
+            type?: "urn:sentinel:problem:http_error";
+        });
         /** Project */
         Project: {
             /**

@@ -104,7 +104,7 @@ def test_project_and_change_event_roll_back_in_one_transaction(engine: Engine) -
         unit_of_work.changes.add(
             ChangeEvent(
                 id=UUID("00000000-0000-4000-8000-000000000010"),
-                project_id=SECOND_ID,
+                project_id=FIRST_ID,
                 kind=ChangeEventKind.ENVIRONMENT_CREATED,
                 subject_type=ChangeSubjectType.ENVIRONMENT,
                 subject_id=UUID("00000000-0000-4000-8000-000000000020"),

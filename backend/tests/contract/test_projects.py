@@ -147,6 +147,22 @@ async def test_project_cursor_rejects_duplicate_json_keys(client: httpx.AsyncCli
     assert rejected.json()["errors"][0]["code"] == "cursor_invalid"
 
 
+async def test_project_cursor_rejects_noncanonical_timestamp(client: httpx.AsyncClient) -> None:
+    for name in ("First", "Second"):
+        assert (await client.post("/api/v1/projects", json={"name": name})).status_code == 201
+    response = await client.get("/api/v1/projects", params={"limit": 1})
+    cursor = response.json()["next_cursor"]
+    assert isinstance(cursor, str)
+    decoded = base64.urlsafe_b64decode(cursor + ("=" * (-len(cursor) % 4))).decode("utf-8")
+    noncanonical = decoded.replace("2030-01-01T12:30", "2030-1-1T12:30")
+    malicious = base64.urlsafe_b64encode(noncanonical.encode()).rstrip(b"=").decode()
+
+    rejected = await client.get("/api/v1/projects", params={"cursor": malicious})
+
+    assert rejected.status_code == 422
+    assert rejected.json()["errors"][0]["code"] == "cursor_invalid"
+
+
 async def test_duplicate_name_returns_safe_resource_conflict(
     client: httpx.AsyncClient,
 ) -> None:
@@ -400,3 +416,30 @@ async def test_runtime_openapi_publishes_only_the_implemented_project_slice(
     assert set(get_responses["200"]["headers"]) == {"ETag"}
     assert "Problem" in document["components"]["schemas"]
     assert "/api/v1/projects/{project_id}/environments" not in document["paths"]
+
+
+async def test_runtime_openapi_problem_schema_enforces_exact_safe_variants(
+    client: httpx.AsyncClient,
+) -> None:
+    document = (await client.get("/openapi.json")).json()
+    problem_schema = document["components"]["schemas"]["Problem"]
+
+    variants = {}
+    for variant in problem_schema["oneOf"]:
+        variants[variant["properties"]["code"]["const"]] = variant
+
+    assert variants["validation_failed"]["properties"] == {
+        "code": {"const": "validation_failed"},
+        "status": {"const": 422},
+        "title": {"const": "Request validation failed"},
+        "type": {"const": "urn:sentinel:problem:validation_failed"},
+    }
+    assert variants["resource_conflict"] == {
+        "not": {"required": ["errors"]},
+        "properties": {
+            "code": {"const": "resource_conflict"},
+            "status": {"const": 409},
+            "title": {"const": "Resource conflict"},
+            "type": {"const": "urn:sentinel:problem:resource_conflict"},
+        },
+    }
