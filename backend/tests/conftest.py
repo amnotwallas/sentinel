@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, delete, make_url
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from sentinel.persistence.models import ExecutionRow, JobRow
+from sentinel.persistence.models import ChangeEventRow, ExecutionRow, JobRow, ProjectRow
 from sentinel.persistence.queue import PostgresJobStore
 
 
@@ -40,6 +40,8 @@ def engine() -> Iterator[Engine]:
     with engine.begin() as conn:
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))
+        conn.execute(delete(ChangeEventRow))
+        conn.execute(delete(ProjectRow))
     yield engine
     engine.dispose()
 

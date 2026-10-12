@@ -2,7 +2,9 @@ import asyncio
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
+from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, Request
@@ -11,13 +13,33 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
+from sentinel.api.body_limit import BodyLimitMiddleware
+from sentinel.api.catalog.projects import project_router
 from sentinel.api.problems import problem, validation_problem
+from sentinel.catalog.projects import ProjectService
 from sentinel.config import Settings
+from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
 from sentinel.persistence.database import create_database
 from sentinel.persistence.readiness import database_is_current
 from sentinel.telemetry.runtime import provider
 
 Probe = Callable[[], Awaitable[bool]]
+
+
+class SentinelAPI(FastAPI):
+    def openapi(self) -> dict[str, Any]:
+        schema = super().openapi()
+        # FastAPI always adds its default JSON media type for a documented model.
+        # Sentinel problem responses use RFC 9457's dedicated media type instead.
+        for path in schema.get("paths", {}).values():
+            for operation in path.values():
+                for response in operation.get("responses", {}).values():
+                    content = response.get("content", {})
+                    if "application/problem+json" in content:
+                        json_content = content.pop("application/json", None)
+                        if json_content and not content["application/problem+json"]:
+                            content["application/problem+json"] = json_content
+        return schema
 
 
 class Liveness(BaseModel):
@@ -35,9 +57,10 @@ def create_app(
     *,
     database_probe: Probe | None = None,
     tempo_probe: Probe | None = None,
+    project_service: ProjectService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
-    engine, _ = create_database(settings.database_url.get_secret_value())
+    engine, sessions = create_database(settings.database_url.get_secret_value())
     tracing = provider("sentinel-api", settings.otlp_endpoint)
     tracer = tracing.get_tracer(__name__)
 
@@ -47,7 +70,13 @@ def create_app(
         await asyncio.to_thread(engine.dispose)
         await asyncio.to_thread(tracing.shutdown)
 
-    app = FastAPI(title="Sentinel", version="0.1.0", lifespan=lifespan)
+    app = SentinelAPI(title="Sentinel", version="0.1.0", lifespan=lifespan)
+    catalog = project_service or ProjectService(
+        lambda: PostgresCatalogUnitOfWork(sessions),
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+    )
+    app.include_router(project_router(catalog))
 
     async def tempo_ready() -> bool:
         try:
@@ -56,6 +85,8 @@ def create_app(
                 return response.status_code == 200
         except httpx.HTTPError:
             return False
+
+    app.add_middleware(BodyLimitMiddleware, max_bytes=524_288)
 
     @app.middleware("http")
     async def boundary(
