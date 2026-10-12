@@ -30,6 +30,44 @@ class ProjectRow(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class EnvironmentRow(Base):
+    __tablename__ = "environments"
+    __table_args__ = (
+        CheckConstraint("state_version BETWEEN 1 AND 2147483647", name="environment_state_version"),
+        Index("ix_environments_project_list", "project_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(String(120))
+    active_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "environment_revisions.id",
+            deferrable=True,
+            initially="DEFERRED",
+            use_alter=True,
+            name="fk_environments_active_revision",
+        )
+    )
+    state_version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class EnvironmentRevisionRow(Base):
+    __tablename__ = "environment_revisions"
+    __table_args__ = (
+        CheckConstraint("version BETWEEN 1 AND 2147483647", name="environment_revision_version"),
+        Index("uq_environment_revisions_version", "environment_id", "version", unique=True),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    environment_id: Mapped[UUID] = mapped_column(ForeignKey("environments.id", ondelete="RESTRICT"))
+    version: Mapped[int] = mapped_column(Integer)
+    definition: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ChangeEventRow(Base):
     __tablename__ = "change_events"
     __table_args__ = (

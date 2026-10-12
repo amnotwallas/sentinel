@@ -1,7 +1,7 @@
 # Milestone 2 task plan
 
-Planning only: no Milestone 2 business features are implemented. The schema
-readiness prerequisite is implemented and tested separately. Scope and exit
+Milestone 2 implementation is in progress. The schema-readiness prerequisite and
+project API are integrated; the versioned environment API is the current candidate. Scope and exit
 criteria come from [ROADMAP.md](../ROADMAP.md#milestone-2-versioned-catalog-and-definition-api),
 with endpoint inventory in [MVP.md](../MVP.md#api-acceptance-contract). The accepted
 [architecture](../architecture/README.md) and ADRs remain unchanged. Milestone 1
@@ -107,6 +107,7 @@ writes client-consumption tests/source, not generated artifacts.
 - **Tests:** Service unit tests; PostgreSQL persistence/constraints/rollback;
   API create/read/list/not-found/validation/pagination/auth and safe problem schemas;
   migration upgrade/downgrade/drift and generated contract gate.
+- **Status:** Implemented, verified, and integrated on `main`.
 - **Parallel:** Frontend can examine the existing client; QA drafts cases from
   M2-00. New typed project consumption waits for the generated handoff.
 
@@ -126,6 +127,8 @@ writes client-consumption tests/source, not generated artifacts.
 - **Tests:** Immutable revisions, malformed/static policy, two independent PostgreSQL
   update transactions, rollback, scoped ownership, canary errors/logs/persistence,
   exact MVP endpoint contracts, migrations and generated types.
+- **Status:** Implemented and locally verified as the current integration candidate;
+  merge, push, and remote CI verification remain pending.
 - **Parallel:** Frontend M2-04 and QA review of the project slice can run concurrently.
   Pure test-document validation could be split with a new explicit writer, but the
   default model keeps one backend writer and avoids overlapping security modules.

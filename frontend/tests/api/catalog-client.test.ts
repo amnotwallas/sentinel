@@ -64,4 +64,70 @@ describe('catalog API client', () => {
       '?limit=25&cursor=opaque-cursor',
     );
   });
+
+  it('updates an environment with generated document and If-Match types', async () => {
+    const requests: Request[] = [];
+    const environmentId = '00000000-0000-4000-8000-000000000010';
+    const projectId = '00000000-0000-4000-8000-000000000001';
+    const revisionId = '00000000-0000-4000-8000-000000000013';
+    const fetcher: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return new Response(
+        JSON.stringify({
+          id: environmentId,
+          project_id: projectId,
+          name: 'Production',
+          active_revision_id: revisionId,
+          created_at: '2030-01-01T12:30:00.000000Z',
+          updated_at: '2030-01-01T12:30:01.000000Z',
+          active_revision: {
+            id: revisionId,
+            environment_id: environmentId,
+            version: 2,
+            schema_version: 1,
+            definition: {
+              schema_version: 1,
+              base_url: 'https://v2.example/',
+              variables: {},
+              secret_references: [],
+              target_policy: {
+                schema_version: 1,
+                allowed_hostnames: [],
+                allowed_cidrs: [],
+                denied_hostnames: [],
+                denied_cidrs: [],
+                allowed_ports: null,
+              },
+            },
+            created_at: '2030-01-01T12:30:01.000000Z',
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            etag: `"environment:${environmentId}:2"`,
+          },
+        },
+      );
+    };
+    const client = createApiClient(fetcher);
+
+    const result = await client.PATCH('/api/v1/environments/{environment_id}', {
+      params: {
+        path: { environment_id: environmentId },
+        header: { 'if-match': `"environment:${environmentId}:1"` },
+      },
+      body: { definition: { base_url: 'https://v2.example' } },
+    });
+
+    expect(result.data?.active_revision.version).toBe(2);
+    expect(requests[0]?.headers.get('if-match')).toBe(
+      `"environment:${environmentId}:1"`,
+    );
+    expect(await requests[0]?.json()).toEqual({
+      definition: { base_url: 'https://v2.example' },
+    });
+  });
 });

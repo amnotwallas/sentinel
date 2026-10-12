@@ -51,6 +51,8 @@ def main() -> int:
                 "node",
                 str(tools / "openapi-typescript"),
                 str(spec),
+                "--default-non-nullable",
+                "false",
                 "-o",
                 str(schema),
                 "--redocly",

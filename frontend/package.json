@@ -14,7 +14,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "api:generate": "prettier --write openapi.json && openapi-typescript openapi.json -o src/shared/api/generated/schema.ts"
+    "api:generate": "prettier --write openapi.json && openapi-typescript openapi.json --default-non-nullable false -o src/shared/api/generated/schema.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

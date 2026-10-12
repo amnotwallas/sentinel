@@ -36,19 +36,35 @@ def _timestamp(value: datetime) -> str:
 
 
 def encode_project_cursor(after: tuple[datetime, UUID]) -> str:
+    return _encode_cursor("projects", None, after)
+
+
+def encode_environment_cursor(project_id: UUID, after: tuple[datetime, UUID]) -> str:
+    return _encode_cursor("environments", project_id, after)
+
+
+def _encode_cursor(resource_kind: str, scope_id: UUID | None, after: tuple[datetime, UUID]) -> str:
     created_at, project_id = after
     payload = {
         "after": {"created_at": _timestamp(created_at), "id": str(project_id)},
         "cursor_version": 1,
         "filter_fingerprint": _EMPTY_FILTER_FINGERPRINT,
-        "resource_kind": "projects",
-        "scope_id": None,
+        "resource_kind": resource_kind,
+        "scope_id": str(scope_id) if scope_id is not None else None,
     }
     canonical = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return base64.urlsafe_b64encode(canonical.encode("utf-8")).rstrip(b"=").decode("ascii")
 
 
 def decode_project_cursor(value: str) -> tuple[datetime, UUID]:
+    return _decode_cursor(value, "projects", None)
+
+
+def decode_environment_cursor(project_id: UUID, value: str) -> tuple[datetime, UUID]:
+    return _decode_cursor(value, "environments", project_id)
+
+
+def _decode_cursor(value: str, resource_kind: str, scope_id: UUID | None) -> tuple[datetime, UUID]:
     try:
         if not _CURSOR_PATTERN.fullmatch(value):
             raise CursorInvalid
@@ -71,8 +87,8 @@ def decode_project_cursor(value: str) -> tuple[datetime, UUID]:
             raise CursorInvalid
         if (
             payload["cursor_version"] != 1
-            or payload["resource_kind"] != "projects"
-            or payload["scope_id"] is not None
+            or payload["resource_kind"] != resource_kind
+            or payload["scope_id"] != (str(scope_id) if scope_id is not None else None)
             or payload["filter_fingerprint"] != _EMPTY_FILTER_FINGERPRINT
         ):
             raise CursorInvalid

@@ -364,7 +364,7 @@ async def test_authentication_is_checked_before_the_request_body_is_read() -> No
     assert response.json()["code"] == "authentication_required"
 
 
-async def test_runtime_openapi_publishes_only_the_implemented_project_slice(
+async def test_runtime_openapi_publishes_the_implemented_catalog_slices(
     client: httpx.AsyncClient,
 ) -> None:
     document = (await client.get("/openapi.json")).json()
@@ -415,7 +415,14 @@ async def test_runtime_openapi_publishes_only_the_implemented_project_slice(
     assert set(get_responses) == {"200", "401", "403", "404", "422", "500"}
     assert set(get_responses["200"]["headers"]) == {"ETag"}
     assert "Problem" in document["components"]["schemas"]
-    assert "/api/v1/projects/{project_id}/environments" not in document["paths"]
+    assert set(document["paths"]["/api/v1/projects/{project_id}/environments"]) == {
+        "get",
+        "post",
+    }
+    assert set(document["paths"]["/api/v1/environments/{environment_id}"]) == {
+        "get",
+        "patch",
+    }
 
 
 async def test_runtime_openapi_problem_schema_enforces_exact_safe_variants(

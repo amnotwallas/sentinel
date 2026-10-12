@@ -380,14 +380,18 @@ Readiness must compare the database revision against the running package's suppo
 
 Minimum named contract fixtures: project create/list/notfound; environment create/rename/full-definition change; valid strict test document containing synthetic reference; rejected credential literal/context; unrelated baggage allowed; canonical reordered-object/numeric vectors; explicit unsafe replay consent; stale/missing/malformed ETag; cross-scope/invalid cursor; suite exact revision order/duplicate case/missing membership; two concurrent writes one412; transaction rollback leaves no history; catalog reads invoke no DNS/dispatch/secret resolver; canaries absent from API/logs/spans/database; future queued/evaluated/ambiguous/expired-artifact/missing-Tempo result; inventory-only and needs-configuration OpenAPI previews with no external fetch.
 
-Current repository has only health API and probe execution/job rows; none of these future definitions are implemented. The planned schema below is separate from the active generated health contract. A later authorized task implements and verifies each applicable slice before the coordinator regenerates runtime artifacts.
+The current repository implements health, projects, and the versioned environment
+API candidate alongside probe execution/job rows. Later catalog definitions remain
+planned only. The planned schema stays broader than the active generated contract;
+each later slice must be implemented and verified before runtime regeneration.
 
 ## 12. Machine-readable handoff and implementation start
 
 [Planned OpenAPI](../contracts/milestone-2.openapi.json) defines the catalog routes
 and future components. [Synthetic fixtures](../contracts/milestone-2.fixtures.json)
 provide named transport examples. Neither is the active API: `frontend/openapi.json`
-and its generated TypeScript still describe only the implemented health endpoints.
+and its generated TypeScript describe only the implemented health, project, and
+environment endpoints.
 Generate planned client types only into a temporary directory; do not replace the
 runtime artifacts or register planned routes during this prerequisite task.
 
@@ -395,9 +399,8 @@ Run `make check-planned-contract` for the executable planning gate. Its existing
 locked generator uses explicit discriminator mappings, `defaultNonNullable: false`
 and schema-derived recursive type aliases through the public `postTransform` API.
 Those choices preserve wire tags and optional inputs and avoid TS2502 without
-handwritten client shapes or `any`. The coordinator carries the same generation
-behavior into the active generator/drift checker when a later slice adds these
-models; the current health-only artifacts and CI are unchanged.
+handwritten client shapes or `any`. The active generator and drift checker now use
+the same optional-default behavior for the implemented catalog models.
 
 Schema validation covers structure, unions, references and bounds. Service and
 policy tests must cover ETag transactions, membership, named secret placement,
@@ -415,9 +418,8 @@ check runs no migration environment or upgrade; Tempo degradation is independent
 The supported source checkout and Docker image ship these assets together; a
 standalone wheel without them fails closed and is not a supported deployment.
 
-M2-01’s future catalog fixture cleanup remains with the coordinator until catalog
-FKs exist. It is not implemented speculatively here. The first implementation is
-M2-02 (projects and transaction ports), with QA preparing independent acceptance
-cases. Frontend can review planned fixtures now; its runtime typed-consumption
-work begins after M2-02’s integrated Pydantic/OpenAPI generation. See the exact
-worktree start commands in [workflow](../development/workflow.md#starting-parallel-work).
+M2-01 catalog fixture cleanup now covers project and environment foreign keys.
+M2-02 projects are integrated, and the M2-03 environment slice includes active
+Pydantic/OpenAPI generation and typed client consumption. Later M2 slices remain
+governed by the worktree handoff process in
+[workflow](../development/workflow.md#starting-parallel-work).

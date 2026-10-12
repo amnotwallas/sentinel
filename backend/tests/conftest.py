@@ -4,11 +4,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine, delete, make_url
+from sqlalchemy import create_engine, delete, make_url, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from sentinel.persistence.models import ChangeEventRow, ExecutionRow, JobRow, ProjectRow
+from sentinel.persistence.models import (
+    ChangeEventRow,
+    EnvironmentRevisionRow,
+    EnvironmentRow,
+    ExecutionRow,
+    JobRow,
+    ProjectRow,
+)
 from sentinel.persistence.queue import PostgresJobStore
 
 
@@ -38,9 +45,12 @@ def engine() -> Iterator[Engine]:
         pytest.fail("Integration tests require a dedicated postgresql+psycopg *_test database")
     engine = create_engine(url, pool_pre_ping=True, hide_parameters=True)
     with engine.begin() as conn:
+        conn.execute(text("SET CONSTRAINTS fk_environments_active_revision DEFERRED"))
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))
         conn.execute(delete(ChangeEventRow))
+        conn.execute(delete(EnvironmentRevisionRow))
+        conn.execute(delete(EnvironmentRow))
         conn.execute(delete(ProjectRow))
     yield engine
     engine.dispose()

@@ -14,13 +14,16 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from sentinel.api.body_limit import BodyLimitMiddleware
+from sentinel.api.catalog.environments import environment_router
 from sentinel.api.catalog.projects import project_router
 from sentinel.api.problems import problem, validation_problem
+from sentinel.catalog.environments import EnvironmentService
 from sentinel.catalog.projects import ProjectService
 from sentinel.config import Settings
 from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
 from sentinel.persistence.database import create_database
 from sentinel.persistence.readiness import database_is_current
+from sentinel.security.definition_policy import validate_environment_document
 from sentinel.telemetry.runtime import provider
 
 Probe = Callable[[], Awaitable[bool]]
@@ -39,6 +42,14 @@ class SentinelAPI(FastAPI):
                         json_content = content.pop("application/json", None)
                         if json_content and not content["application/problem+json"]:
                             content["application/problem+json"] = json_content
+        update = (
+            schema.get("paths", {}).get("/api/v1/environments/{environment_id}", {}).get("patch")
+        )
+        if update is not None:
+            for parameter in update.get("parameters", []):
+                if parameter.get("in") == "header" and parameter.get("name") == "if-match":
+                    # Runtime handles absence itself to return the contractual 428.
+                    parameter["required"] = True
         return schema
 
 
@@ -58,6 +69,7 @@ def create_app(
     database_probe: Probe | None = None,
     tempo_probe: Probe | None = None,
     project_service: ProjectService | None = None,
+    environment_service: EnvironmentService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url.get_secret_value())
@@ -77,6 +89,13 @@ def create_app(
         clock=lambda: datetime.now(UTC),
     )
     app.include_router(project_router(catalog))
+    environments = environment_service or EnvironmentService(
+        lambda: PostgresCatalogUnitOfWork(sessions),
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+        validate_document=validate_environment_document,
+    )
+    app.include_router(environment_router(environments))
 
     async def tempo_ready() -> bool:
         try:

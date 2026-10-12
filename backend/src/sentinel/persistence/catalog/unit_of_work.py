@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sentinel.catalog.projects import ProjectNameConflict
 from sentinel.persistence.catalog.changes import SqlAlchemyChangeRepository
+from sentinel.persistence.catalog.environments import SqlAlchemyEnvironmentRepository
 from sentinel.persistence.catalog.projects import SqlAlchemyProjectRepository
 
 
@@ -16,6 +17,7 @@ class PostgresCatalogUnitOfWork:
     def __enter__(self) -> "PostgresCatalogUnitOfWork":
         self._session = self._sessions()
         self.projects = SqlAlchemyProjectRepository(self._session)
+        self.environments = SqlAlchemyEnvironmentRepository(self._session)
         self.changes = SqlAlchemyChangeRepository(self._session)
         return self
 

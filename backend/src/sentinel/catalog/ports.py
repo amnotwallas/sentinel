@@ -6,6 +6,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from sentinel.catalog.changes import ChangeEvent
+    from sentinel.catalog.environments import Environment
     from sentinel.catalog.projects import Project
 
 
@@ -24,6 +25,22 @@ class ProjectRepository(Protocol):
 
 class ChangeRepository(Protocol):
     def add(self, event: "ChangeEvent") -> None: ...
+
+
+class EnvironmentRepository(Protocol):
+    def add(self, environment: "Environment") -> None: ...
+
+    def get(self, environment_id: UUID, *, for_update: bool = False) -> "Environment | None": ...
+
+    def replace(self, environment: "Environment") -> None: ...
+
+    def list_after(
+        self,
+        *,
+        project_id: UUID,
+        after: tuple[datetime, UUID] | None,
+        limit: int,
+    ) -> list["Environment"]: ...
 
 
 class ProjectUnitOfWork(Protocol):
@@ -46,5 +63,9 @@ class CatalogUnitOfWork(ProjectUnitOfWork, Protocol):
     @property
     def changes(self) -> ChangeRepository: ...
 
+    @property
+    def environments(self) -> EnvironmentRepository: ...
+
 
 UnitOfWorkFactory = Callable[[], ProjectUnitOfWork]
+CatalogUnitOfWorkFactory = Callable[[], CatalogUnitOfWork]
