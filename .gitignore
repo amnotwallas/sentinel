@@ -65,5 +65,6 @@ logs/
 *~
 .codex/
 .superpowers/
+.worktrees/
 
 # Keep dependency locks and the OpenAPI/client artifacts: CI verifies them.

@@ -8,13 +8,13 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
-from sqlalchemy import text
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from sentinel.api.problems import problem, validation_problem
 from sentinel.config import Settings
 from sentinel.persistence.database import create_database
+from sentinel.persistence.readiness import database_is_current
 from sentinel.telemetry.runtime import provider
 
 Probe = Callable[[], Awaitable[bool]]
@@ -48,14 +48,6 @@ def create_app(
         await asyncio.to_thread(tracing.shutdown)
 
     app = FastAPI(title="Sentinel", version="0.1.0", lifespan=lifespan)
-
-    def postgres_ready() -> bool:
-        try:
-            with engine.connect() as conn:
-                version = conn.scalar(text("SELECT version_num FROM alembic_version"))
-                return isinstance(version, str) and version == "0001"
-        except Exception:
-            return False
 
     async def tempo_ready() -> bool:
         try:
@@ -107,7 +99,7 @@ def create_app(
     @app.get("/health/ready", response_model=Readiness, responses={503: {"model": Readiness}})
     async def ready(response: Response) -> Readiness:
         postgres, tempo = await asyncio.gather(
-            database_probe() if database_probe else asyncio.to_thread(postgres_ready),
+            database_probe() if database_probe else asyncio.to_thread(database_is_current, engine),
             tempo_probe() if tempo_probe else tempo_ready(),
         )
         response.status_code = 200 if postgres else 503

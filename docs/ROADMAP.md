@@ -33,16 +33,15 @@ milestone, not deferred to a final cleanup phase.
 
 ## Milestone 1: Repository foundation and durable work skeleton
 
-Implementation is present. Native checks and Docker Desktop acceptance on macOS
+Milestone 1 is complete. Native checks and Docker Desktop acceptance on macOS
 are recorded in [the implementation ledger](implementation/milestone-1.md),
 including full-stack health, actual in-flight worker recovery/fencing, and
-PostgreSQL named-volume persistence across restart/replacement. GitHub Actions
-execution for this implementation remains unverified. The implementation has
-been migrated to `amnotwallas/sentinel` on `main`; the remote currently contains
-only its README bootstrap commit. An implementation commit and push await
-explicit authorization.
-Milestone 1 is not fully accepted until the required CI gate passes; Milestone 2
-has not started.
+PostgreSQL named-volume persistence across restart/replacement. The implementation
+was committed and pushed to `amnotwallas/sentinel` on `main` as
+`62635ea71566dc8e21118667a393ed944f6a0cce`. The user confirmed all GitHub Actions
+backend, frontend, and Compose jobs passed. The run URL/logs were not independently
+captured in this checkout; this CI status is user-reported. Milestone 2 has not
+started; its proposed task breakdown is in [the development plan](development/milestone-2-plan.md).
 
 ### Goal
 

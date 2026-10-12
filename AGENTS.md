@@ -4,6 +4,22 @@ This file applies to the entire repository. More specific `AGENTS.md` files may
 add local rules but must not weaken the architecture, safety, privacy, or test
 requirements documented here.
 
+## Development collaboration
+
+Follow `docs/development/workflow.md` for task ownership, isolated worktrees,
+handoffs, and integration. Use one writer per file; the coordinator owns shared
+wiring, migration allocation, and generated contracts unless ownership is
+explicitly transferred. Worktrees also require separate test databases and
+reserved runtime ports. Read-only review may share a checkout.
+
+Repository workflows live in `.agents/skills/`: `sentinel-feature`,
+`sentinel-quality-gate`, `sentinel-security-review`, and `sentinel-pr-prepare`.
+Use `docs/development/quality-gates.md` for local commands. `make check-fast`
+does not replace PostgreSQL/migration, full Compose, or required CI gates.
+Successful checks do not grant commit, push, merge, or remote-setting permission.
+Use `docs/implementation/milestone-2.md` and its planned schema for M2 contracts;
+runtime generated artifacts describe implemented routes only.
+
 ## Product boundaries
 
 Sentinel is an open-source, self-hosted API reliability and distributed tracing

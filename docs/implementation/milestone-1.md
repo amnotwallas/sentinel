@@ -1,7 +1,7 @@
 # Repository Foundation and Durable Work Skeleton Implementation Plan
 
-> Execution: inline, using test-driven development and verification. No commits
-> are authorized. Implementation originally stayed in the supplied empty
+> Historical execution: inline, using test-driven development and verification.
+> Commits were not authorized during implementation. Work stayed in the supplied empty
 > repository because it could not create a git worktree without a first commit.
 > The implementation is now migrated to the cloned `amnotwallas/sentinel`
 > repository on `main`; its README bootstrap commit is separate from this work.
@@ -18,10 +18,13 @@ OpenTelemetry, React, TypeScript, Vite, pytest, Vitest, Docker Compose.
 **Spec:** `docs/ROADMAP.md`, `docs/MVP.md`, `docs/architecture/README.md`, and
 accepted ADRs 0001–0007.
 
-**Current acceptance status:** Docker Desktop acceptance passed on macOS on
-2026-10-09 (local time); GitHub Actions execution remains unverified. Milestone 1
-is **not fully accepted** under the roadmap's CI gate. See the macOS acceptance
-section below; earlier daemon-unavailable reports are historical evidence.
+**Current acceptance status:** Milestone 1 is complete. Docker Desktop acceptance
+passed on macOS on 2026-10-09 (local time). The authorized implementation commit
+`62635ea71566dc8e21118667a393ed944f6a0cce` was pushed to `main`; the user confirmed
+all three GitHub Actions jobs passed (backend 46s, frontend 24s, Compose 1m23s).
+The run URL/logs have not been independently captured here; CI success is
+user-reported. Earlier pending/daemon-unavailable reports below are historical
+evidence, not current blockers. Milestone 2 has not started.
 
 ## Constraints and review focus
 
@@ -722,6 +725,20 @@ The mandatory GitHub Actions gate remains unverified until an authorized
 implementation commit and push. The earlier controlled crash/persistence harness
 is still temporary rather than tracked CI coverage. These limitations remain;
 Milestone 1 is not formally accepted and Milestone 2 has not started.
+
+## Post-push acceptance update: 2026-10-09
+
+The explicitly authorized commit and push completed as
+`62635ea71566dc8e21118667a393ed944f6a0cce` on `main` in `amnotwallas/sentinel`.
+The user subsequently confirmed the backend, frontend (Vitest 1/1), and Compose
+Actions jobs passed and explicitly identified Milestone 1 as complete. This
+supersedes the earlier pending-CI/authorization status above; no acceptance
+criterion was removed. Remote workflow URL/logs remain uncaptured in this ledger.
+
+The process-level crash/persistence harness remains temporary rather than tracked
+CI coverage. Retaining it as repeatable automation is a developer-workflow
+recommendation, not an assertion that it already runs in GitHub Actions. This
+workflow audit added no Milestone 2 product code or additional commits/pushes.
 
 ## File inventory
 

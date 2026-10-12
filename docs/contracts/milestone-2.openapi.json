@@ -1,0 +1,6719 @@
+{
+  "components": {
+    "headers": {
+      "ETag": {
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ETag"
+        }
+      },
+      "Location": {
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/RelativeLink"
+        }
+      }
+    },
+    "parameters": {
+      "Cursor": {
+        "in": "query",
+        "name": "cursor",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/Cursor"
+        }
+      },
+      "IfMatch": {
+        "description": "Missing428;invalid422;stale412;locked transactional update.",
+        "in": "header",
+        "name": "If-Match",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/IfMatch"
+        }
+      },
+      "Limit": {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "environment_id": {
+        "in": "path",
+        "name": "environment_id",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      },
+      "project_id": {
+        "in": "path",
+        "name": "project_id",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      },
+      "suite_id": {
+        "in": "path",
+        "name": "suite_id",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      },
+      "test_case_id": {
+        "in": "path",
+        "name": "test_case_id",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      }
+    },
+    "responses": {
+      "Problem401": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 401
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem403": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 403
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem404": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 404
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem409": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 409
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem412": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 412
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem413": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 413
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem415": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 415
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem422": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 422
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem428": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 428
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      },
+      "Problem500": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 500
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "description": "Safe documented RFC9457 problem"
+      }
+    },
+    "schemas": {
+      "Assertion": {
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "status_code": "#/components/schemas/StatusCodeAssertion",
+            "header_present": "#/components/schemas/HeaderPresentAssertion",
+            "header_equals": "#/components/schemas/HeaderEqualsAssertion",
+            "json_present": "#/components/schemas/JSONPresentAssertion",
+            "json_absent": "#/components/schemas/JSONAbsentAssertion",
+            "json_type": "#/components/schemas/JSONTypeAssertion",
+            "json_equals": "#/components/schemas/JSONEqualsAssertion",
+            "text_equals": "#/components/schemas/TextEqualsAssertion"
+          }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StatusCodeAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/HeaderPresentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/HeaderEqualsAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONPresentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONAbsentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONTypeAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONEqualsAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/TextEqualsAssertion"
+          }
+        ]
+      },
+      "AttemptDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_comparison": {
+            "$ref": "#/components/schemas/BaselineComparison"
+          },
+          "client_span_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpanID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "dispatch_recorded_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            },
+            "maxItems": 257,
+            "minItems": 0,
+            "type": "array"
+          },
+          "execution_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "execution_item_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "included_in_verdict": {
+            "type": "boolean"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "$ref": "#/components/schemas/RelativeLink"
+              }
+            },
+            "required": ["self"],
+            "type": "object"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResponseObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observation_state": {
+            "enum": ["not_recorded", "available", "expired", "omitted"],
+            "type": "string"
+          },
+          "preparation_error_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "secret_missing",
+                  "template_variable_missing",
+                  "target_policy_denied",
+                  "request_invalid",
+                  "infrastructure_failure"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "primary_trace_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replayed_by_attempt_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_fingerprint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SHA256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "response_recorded_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sequence": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AttemptState"
+          },
+          "trace_references": {
+            "items": {
+              "$ref": "#/components/schemas/TraceReference"
+            },
+            "maxItems": 33,
+            "minItems": 0,
+            "type": "array"
+          },
+          "trace_references_truncated": {
+            "type": "boolean"
+          },
+          "transport_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransportOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "state",
+          "verdict",
+          "created_at",
+          "dispatch_recorded_at",
+          "response_recorded_at",
+          "finished_at",
+          "duration_ms",
+          "transport_outcome",
+          "primary_trace_id",
+          "client_span_id",
+          "replayed_by_attempt_id",
+          "included_in_verdict",
+          "links",
+          "execution_id",
+          "execution_item_id",
+          "request_fingerprint",
+          "preparation_error_code",
+          "observation",
+          "observation_state",
+          "baseline_comparison",
+          "evaluations",
+          "trace_references",
+          "trace_references_truncated"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3-M5",
+        "x-max-encoded-utf8-bytes": 8388608,
+        "x-milestone": "future",
+        "x-open-decision": "Transport-failure checkpoint/transition requires M3 review;no new attempt state invented.",
+        "x-semantic-validation": [
+          "not_recorded/expired=>null observation",
+          "no resolved outbound request returned"
+        ]
+      },
+      "AttemptState": {
+        "enum": [
+          "prepared",
+          "dispatching",
+          "response_received",
+          "evaluated",
+          "replay_scheduled",
+          "indeterminate",
+          "failed"
+        ],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "AttemptSummary": {
+        "additionalProperties": false,
+        "description": "Independent positive attempt sequence;never derived from queue/trace retry counts. Duration independent of timeout bounds.",
+        "properties": {
+          "client_span_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpanID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "dispatch_recorded_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "included_in_verdict": {
+            "type": "boolean"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "$ref": "#/components/schemas/RelativeLink"
+              }
+            },
+            "required": ["self"],
+            "type": "object"
+          },
+          "primary_trace_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replayed_by_attempt_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "response_recorded_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sequence": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AttemptState"
+          },
+          "transport_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransportOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "state",
+          "verdict",
+          "created_at",
+          "dispatch_recorded_at",
+          "response_recorded_at",
+          "finished_at",
+          "duration_ms",
+          "transport_outcome",
+          "primary_trace_id",
+          "client_span_id",
+          "replayed_by_attempt_id",
+          "included_in_verdict",
+          "links"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "dispatched state requires checkpoint/trace/span",
+          "replay new IDs;predecessor retained"
+        ]
+      },
+      "BaselineComparison": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": ["compatible", "incompatible"]
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "baseline_id": {
+                  "$ref": "#/components/schemas/UUID"
+                },
+                "baseline_version": {
+                  "$ref": "#/components/schemas/Version"
+                },
+                "checked_at": {
+                  "$ref": "#/components/schemas/Timestamp"
+                },
+                "policy_fingerprint": {
+                  "$ref": "#/components/schemas/SHA256"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": ["not_requested", "pending", "missing"]
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "baseline_id": {
+                  "type": "null"
+                },
+                "baseline_version": {
+                  "type": "null"
+                },
+                "policy_fingerprint": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "baseline_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_fingerprint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SHA256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "not_requested",
+              "pending",
+              "missing",
+              "incompatible",
+              "compatible"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "baseline_id",
+          "baseline_version",
+          "policy_fingerprint",
+          "checked_at"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M4",
+        "x-milestone": "future",
+        "x-open-decision": "M4 first-baseline bootstrap and candidate-selection time need product/ADR decision;this stores actual immutable candidate."
+      },
+      "BodyKind": {
+        "enum": ["json", "text", "omitted"],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "CIDR": {
+        "maxLength": 64,
+        "minLength": 3,
+        "pattern": "^[0-9a-f:.]+/(?:0|[1-9][0-9]{0,2})$",
+        "type": "string",
+        "x-semantic-validation": [
+          "strict address parsing",
+          "no host bits",
+          "IPv4 prefix<=32;IPv6<=128"
+        ]
+      },
+      "CanonicalAssertion": {
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "status_code": "#/components/schemas/StatusCodeAssertion",
+            "header_present": "#/components/schemas/CanonicalHeaderPresentAssertion",
+            "header_equals": "#/components/schemas/CanonicalHeaderEqualsAssertion",
+            "json_present": "#/components/schemas/JSONPresentAssertion",
+            "json_absent": "#/components/schemas/JSONAbsentAssertion",
+            "json_type": "#/components/schemas/JSONTypeAssertion",
+            "json_equals": "#/components/schemas/JSONEqualsAssertion",
+            "text_equals": "#/components/schemas/TextEqualsAssertion"
+          }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StatusCodeAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/CanonicalHeaderPresentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/CanonicalHeaderEqualsAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONPresentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONAbsentAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONTypeAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/JSONEqualsAssertion"
+          },
+          {
+            "$ref": "#/components/schemas/TextEqualsAssertion"
+          }
+        ]
+      },
+      "CanonicalComparisonPolicy": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "text_body_selector": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "exact_text_body": {
+                  "const": true
+                }
+              },
+              "required": ["exact_text_body"]
+            },
+            "then": {
+              "properties": {
+                "selectors": {
+                  "maxItems": 0
+                },
+                "text_body_selector": {
+                  "$ref": "#/components/schemas/TextSelector"
+                }
+              },
+              "required": ["text_body_selector"]
+            }
+          }
+        ],
+        "properties": {
+          "exact_text_body": {
+            "default": false,
+            "type": "boolean"
+          },
+          "performance_threshold_ms": {
+            "anyOf": [
+              {
+                "maximum": 120000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalJSONSelector"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "text_body_selector": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextSelector"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "schema_version",
+          "selectors",
+          "exact_text_body",
+          "text_body_selector",
+          "performance_threshold_ms"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "unique selector pointers and revision rule UUIDs",
+          "SHA256 over complete default-materialized canonical policy",
+          "object keys sorted;array order preserved;no float intermediate"
+        ]
+      },
+      "CanonicalEnvironmentDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^https?://[^@/?#\\\\\\s]+(?:/[^?#\\\\\\s]*)?$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048,
+            "x-normalization": [
+              "lowercase IDNA",
+              "canonical IPv6",
+              "remove default port",
+              "trailing slash"
+            ],
+            "x-semantic-validation": [
+              "valid authority/port",
+              "no dot segments",
+              "no template"
+            ]
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "secret_references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SecretReference"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "target_policy": {
+            "$ref": "#/components/schemas/CanonicalTargetPolicy"
+          },
+          "variables": {
+            "additionalProperties": {
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string",
+              "x-max-utf8-bytes": 4096
+            },
+            "default": {},
+            "maxProperties": 128,
+            "propertyNames": {
+              "$ref": "#/components/schemas/VariableName"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema_version",
+          "base_url",
+          "variables",
+          "secret_references",
+          "target_policy"
+        ],
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144
+      },
+      "CanonicalHeaderEqualsAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "maxLength": 8192,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 8192
+          },
+          "header_name": {
+            "$ref": "#/components/schemas/CanonicalHeaderName",
+            "not": {
+              "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+            }
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "header_equals",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "header_name", "expected"],
+        "type": "object"
+      },
+      "CanonicalHeaderName": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[!#$%&'*+.^_\\x60|~0-9a-z-]+$",
+        "type": "string",
+        "x-max-utf8-bytes": 128
+      },
+      "CanonicalHeaderPresentAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "header_name": {
+            "$ref": "#/components/schemas/CanonicalHeaderName"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "header_present",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "header_name"],
+        "type": "object"
+      },
+      "CanonicalJSONSelector": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "normalizer": {
+            "$ref": "#/components/schemas/Normalizer",
+            "default": {
+              "name": "none",
+              "version": 1
+            }
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "pointer", "normalizer"],
+        "type": "object"
+      },
+      "CanonicalRedaction": {
+        "additionalProperties": false,
+        "properties": {
+          "header_names": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalHeaderName"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "json_pointers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JSONPointer"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["schema_version", "json_pointers", "header_names"],
+        "type": "object"
+      },
+      "CanonicalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestBody"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "connect_timeout_ms": {
+            "default": 5000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "follow_redirects": {
+            "default": false,
+            "type": "boolean"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalRequestHeader"
+            },
+            "maxItems": 64,
+            "minItems": 0,
+            "type": "array"
+          },
+          "max_redirects": {
+            "default": 3,
+            "maximum": 3,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max_response_bytes": {
+            "default": 262144,
+            "maximum": 1048576,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "method": {
+            "$ref": "#/components/schemas/Method"
+          },
+          "path": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^/(?!/)[^?#\\\\\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048
+          },
+          "query": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/QueryParameter"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "read_timeout_ms": {
+            "default": 10000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeout_ms": {
+            "default": 30000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "verify_tls": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "method",
+          "path",
+          "query",
+          "headers",
+          "body",
+          "timeout_ms",
+          "connect_timeout_ms",
+          "read_timeout_ms",
+          "follow_redirects",
+          "max_redirects",
+          "verify_tls",
+          "max_response_bytes"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "connect/read<=total",
+          "headers aggregate<=32768 bytes;unique normalized name",
+          "exact variable template grammar only",
+          "path no authority/dot segment;append below base prefix",
+          "limits may be lowered by deployment",
+          "TLS opt-out runtime policy needs M3 review"
+        ]
+      },
+      "CanonicalRequestHeader": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "not": {
+              "properties": {
+                "name": {
+                  "pattern": "^(?:[tT][rR][aA][cC][eE][pP][aA][rR][eE][nN][tT]|[tT][rR][aA][cC][eE][sS][tT][aA][tT][eE]|[hH][oO][sS][tT]|[cC][oO][nN][tT][eE][nN][tT]-[lL][eE][nN][gG][tT][hH]|[tT][rR][aA][nN][sS][fF][eE][rR]-[eE][nN][cC][oO][dD][iI][nN][gG]|[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[uU][pP][gG][rR][aA][dD][eE]|[pP][rR][oO][xX][yY]-[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[tT][rR][aA][iI][lL][eE][rR]|[tT][eE]|[eE][xX][pP][eE][cC][tT])$"
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+                }
+              },
+              "required": ["name"]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/SecretReference"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^[bB][aA][gG][gG][aA][gG][eE]$"
+                }
+              },
+              "required": ["name"]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "pattern": "(^|,)\\s*(?:[sS][eE][nN][tT][iI][nN][eE][lL]\\.[eE][xX][eE][cC][uU][tT][iI][oO][nN]\\.[iI][dD]|[sS][eE][nN][tT][iI][nN][eE][lL]\\.[aA][tT][tT][eE][mM][pP][tT]\\.[iI][dD])\\s*="
+                      }
+                    },
+                    {
+                      "not": {
+                        "pattern": "\\{\\{|\\}\\}"
+                      }
+                    }
+                  ],
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "pattern": "^[\\x20-\\x7e]*$",
+                  "type": "string",
+                  "x-max-utf8-bytes": 4096
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/CanonicalHeaderName"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "maxLength": 8192,
+                "minLength": 0,
+                "pattern": "^[^\\u0000\\r\\n]*$",
+                "type": "string",
+                "x-max-utf8-bytes": 8192
+              },
+              {
+                "$ref": "#/components/schemas/SecretReference"
+              }
+            ]
+          }
+        },
+        "required": ["name", "value"],
+        "type": "object"
+      },
+      "CanonicalTargetPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_ports": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 128,
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "denied_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "denied_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "allowed_hostnames",
+          "allowed_cidrs",
+          "denied_hostnames",
+          "denied_cidrs",
+          "allowed_ports"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "deployment deny wins",
+          "ports only narrow deployment",
+          "explicit allow exceptions for blocked addresses",
+          "static syntax only;future worker DNS/address checks"
+        ]
+      },
+      "CanonicalTestDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_unsafe_replay": {
+            "default": false,
+            "type": "boolean"
+          },
+          "assertions": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalAssertion"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "comparison_policy": {
+            "$ref": "#/components/schemas/CanonicalComparisonPolicy"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/CanonicalRedaction"
+          },
+          "request": {
+            "$ref": "#/components/schemas/CanonicalRequest"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "request",
+          "assertions",
+          "comparison_policy",
+          "redaction",
+          "allow_unsafe_replay"
+        ],
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144,
+        "x-max-depth": 32
+      },
+      "ChangeEvent": {
+        "additionalProperties": false,
+        "description": "Internal M2 persistence;future result wire only,no public history route. No raw names/keys/values/URL/body in summary.",
+        "properties": {
+          "after_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "enum": [
+              "environment_created",
+              "environment_updated",
+              "test_case_created",
+              "test_case_revised",
+              "suite_created",
+              "suite_revised",
+              "baseline_activated"
+            ],
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "subject_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "subject_type": {
+            "enum": ["environment", "test_case", "suite", "baseline"],
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": false,
+            "properties": {
+              "changed_fields": {
+                "items": {
+                  "enum": [
+                    "name",
+                    "base_url",
+                    "variables",
+                    "secret_references",
+                    "target_policy",
+                    "request",
+                    "assertions",
+                    "comparison_policy",
+                    "redaction",
+                    "allow_unsafe_replay",
+                    "suite_items",
+                    "baseline_activation"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 16,
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": ["changed_fields"],
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "kind",
+          "subject_type",
+          "subject_id",
+          "before_ref",
+          "after_ref",
+          "summary",
+          "created_at"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3-M4",
+        "x-milestone": "future"
+      },
+      "ComparisonPolicy": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "text_body_selector": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "exact_text_body": {
+                  "const": true
+                }
+              },
+              "required": ["exact_text_body"]
+            },
+            "then": {
+              "properties": {
+                "selectors": {
+                  "maxItems": 0
+                },
+                "text_body_selector": {
+                  "$ref": "#/components/schemas/TextSelector"
+                }
+              },
+              "required": ["text_body_selector"]
+            }
+          }
+        ],
+        "properties": {
+          "exact_text_body": {
+            "default": false,
+            "type": "boolean"
+          },
+          "performance_threshold_ms": {
+            "anyOf": [
+              {
+                "maximum": 120000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "selectors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JSONSelector"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "text_body_selector": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextSelector"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "type": "object",
+        "x-semantic-validation": [
+          "unique selector pointers and revision rule UUIDs",
+          "SHA256 over complete default-materialized canonical policy",
+          "object keys sorted;array order preserved;no float intermediate"
+        ]
+      },
+      "CorrelationSource": {
+        "enum": ["sentinel_context", "baggage_attribute_search"],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "CreatedAfter": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": ["created_at", "id"],
+        "type": "object"
+      },
+      "Cursor": {
+        "description": "Opaque unpadded base64url of DecodedCursor. Decode<=1536 bytes; scope/filter validation remains application behavior.",
+        "maxLength": 2048,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "type": "string",
+        "x-semantic-validation": [
+          "decoded shape/size",
+          "route/scope/filter match",
+          "matching sort key"
+        ]
+      },
+      "DecimalNumber": {
+        "description": "Finite original decimal token <=38 significant digits, adjusted exponent -128..128; canonical plain decimal/negative zero0; no binary float decision.",
+        "type": "number",
+        "x-adjusted-exponent-max": 128,
+        "x-adjusted-exponent-min": -128,
+        "x-max-significant-digits": 38
+      },
+      "DecodedCursor": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "after": {
+                  "$ref": "#/components/schemas/CreatedAfter"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "resource_kind": {
+                  "const": "test_case_revisions"
+                }
+              },
+              "required": ["resource_kind"]
+            },
+            "then": {
+              "properties": {
+                "after": {
+                  "$ref": "#/components/schemas/RevisionAfter"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CreatedAfter"
+              },
+              {
+                "$ref": "#/components/schemas/RevisionAfter"
+              }
+            ]
+          },
+          "cursor_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "filter_fingerprint": {
+            "$ref": "#/components/schemas/SHA256"
+          },
+          "resource_kind": {
+            "enum": [
+              "projects",
+              "environments",
+              "test_cases",
+              "test_case_revisions",
+              "suites",
+              "executions"
+            ],
+            "type": "string"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cursor_version",
+          "resource_kind",
+          "scope_id",
+          "filter_fingerprint",
+          "after"
+        ],
+        "type": "object",
+        "x-internal": true,
+        "x-max-encoded-utf8-bytes": 1536
+      },
+      "ETag": {
+        "description": "Strong opaque state_version ETag; state_version1..2147483647 differs from revision version.",
+        "maxLength": 128,
+        "minLength": 3,
+        "pattern": "^\"(?:project|environment|test_case|suite):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[1-9][0-9]*\"$",
+        "type": "string"
+      },
+      "EnvironmentCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/EnvironmentDocument"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "required": ["name", "definition"],
+        "type": "object"
+      },
+      "EnvironmentDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision": {
+            "$ref": "#/components/schemas/EnvironmentRevision"
+          },
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "pointer equals revision.id;revision owner equals identity.id"
+        ]
+      },
+      "EnvironmentDocument": {
+        "additionalProperties": false,
+        "description": "Exact tagged declarations, descriptive only; no aliases/grants/value or resolution.",
+        "properties": {
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^https?://[^@/?#\\\\\\s]+(?:/[^?#\\\\\\s]*)?$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048,
+            "x-normalization": [
+              "lowercase IDNA",
+              "canonical IPv6",
+              "remove default port",
+              "trailing slash"
+            ],
+            "x-semantic-validation": [
+              "valid authority/port",
+              "no dot segments",
+              "no template"
+            ]
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "secret_references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SecretReference"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "target_policy": {
+            "$ref": "#/components/schemas/TargetPolicy",
+            "default": {
+              "allowed_cidrs": [],
+              "allowed_hostnames": [],
+              "allowed_ports": null,
+              "denied_cidrs": [],
+              "denied_hostnames": [],
+              "schema_version": 1
+            }
+          },
+          "variables": {
+            "additionalProperties": {
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string",
+              "x-max-utf8-bytes": 4096
+            },
+            "default": {},
+            "maxProperties": 128,
+            "propertyNames": {
+              "$ref": "#/components/schemas/VariableName"
+            },
+            "type": "object"
+          }
+        },
+        "required": ["base_url"],
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144
+      },
+      "EnvironmentPage": {
+        "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentSummary"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "EnvironmentPatch": {
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": ["name"]
+          },
+          {
+            "required": ["definition"]
+          }
+        ],
+        "description": "Nonempty:whole definition replacement=>new revision;name-only=>state_version/change event,no revision.",
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/EnvironmentDocument"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "EnvironmentRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/CanonicalEnvironmentDocument"
+          },
+          "environment_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "schema_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "environment_id",
+          "version",
+          "schema_version",
+          "definition",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "EnvironmentSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "active_revision_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision_version"
+        ],
+        "type": "object"
+      },
+      "Evaluation": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "rule_id": {
+                  "$ref": "#/components/schemas/UUID"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "performance"
+                }
+              },
+              "required": ["kind"]
+            },
+            "then": {
+              "properties": {
+                "rule_id": {
+                  "type": "null"
+                },
+                "severity": {
+                  "const": "advisory",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidence_omitted": {
+                  "const": true
+                }
+              },
+              "required": ["evidence_omitted"]
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "null"
+                },
+                "expected": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "actual": {
+            "$ref": "#/components/schemas/JSONValue"
+          },
+          "evidence_omitted": {
+            "type": "boolean"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/JSONValue"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "enum": ["assertion", "baseline_selector", "performance"],
+            "type": "string"
+          },
+          "message_code": {
+            "enum": [
+              "assertion_passed",
+              "status_mismatch",
+              "header_missing",
+              "header_mismatch",
+              "json_missing",
+              "json_unexpected",
+              "json_type_mismatch",
+              "json_value_mismatch",
+              "text_mismatch",
+              "invalid_json",
+              "normalizer_input_invalid",
+              "baseline_missing",
+              "baseline_incompatible",
+              "selected_value_mismatch",
+              "duration_exceeded",
+              "content_truncated",
+              "content_redacted",
+              "not_evaluated"
+            ],
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/EvaluationOutcome"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "rule_id",
+          "severity",
+          "outcome",
+          "message_code",
+          "expected",
+          "actual",
+          "evidence_omitted"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M4",
+        "x-milestone": "future",
+        "x-open-decision": "normalizer_input_invalid records an error;accepted docs leave functional verdict mapping unresolved. Do not automatically freeze inconclusive/regression.",
+        "x-semantic-validation": [
+          "expected/actual each<=4096 canonical bytes or omitted"
+        ]
+      },
+      "EvaluationOutcome": {
+        "enum": ["passed", "failed", "unevaluable", "not_evaluated"],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "ExecutionCreate": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "not": {
+              "required": ["suite_id"]
+            },
+            "required": ["test_case_id"]
+          },
+          {
+            "not": {
+              "required": ["test_case_id"]
+            },
+            "required": ["suite_id"]
+          }
+        ],
+        "properties": {
+          "environment_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "suite_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": ["environment_id"],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future"
+      },
+      "ExecutionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "change_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeEvent"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "change_evidence_truncated": {
+            "type": "boolean"
+          },
+          "completed_item_count": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "environment_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "environment_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "item_count": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionItem"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "$ref": "#/components/schemas/RelativeLink"
+              }
+            },
+            "required": ["self"],
+            "type": "object"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_type": {
+            "enum": ["test_case", "suite"],
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "environment_id",
+          "environment_revision_id",
+          "source_type",
+          "source_id",
+          "source_revision_id",
+          "status",
+          "verdict",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "item_count",
+          "completed_item_count",
+          "links",
+          "items",
+          "change_evidence",
+          "change_evidence_truncated"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3-M5",
+        "x-max-encoded-utf8-bytes": 8388608,
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "item_count equals items length;ordinals contiguous",
+          "evidence not root cause"
+        ]
+      },
+      "ExecutionItem": {
+        "additionalProperties": false,
+        "description": "Latest100 attempts in sequence order;explicit total count/truncation,never silent.",
+        "properties": {
+          "attempt_count": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptSummary"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "attempts_truncated": {
+            "type": "boolean"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "ordinal": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "test_case_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_revision_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "ordinal",
+          "test_case_id",
+          "test_case_revision_id",
+          "test_case_revision_version",
+          "status",
+          "verdict",
+          "started_at",
+          "finished_at",
+          "attempts",
+          "attempts_truncated",
+          "attempt_count"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-open-decision": "Historical continuation/pagination needs contract review before supported runtime exceeds this window;no route invented.",
+        "x-semantic-validation": [
+          "count>=len(attempts);truncated iff count>100",
+          "all summaries when count<=100"
+        ]
+      },
+      "ExecutionListQuery": {
+        "additionalProperties": false,
+        "not": {
+          "required": ["test_case_id", "suite_id"]
+        },
+        "properties": {
+          "created_before": {
+            "$ref": "#/components/schemas/InputTimestamp"
+          },
+          "created_from": {
+            "$ref": "#/components/schemas/InputTimestamp"
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          "environment_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "suite_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          }
+        },
+        "required": [],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "from<before;inclusive lower/exclusive upper",
+          "cursor filter fingerprint"
+        ]
+      },
+      "ExecutionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionSummary"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-max-encoded-utf8-bytes": 1048576,
+        "x-milestone": "future"
+      },
+      "ExecutionStatus": {
+        "enum": ["queued", "running", "completed", "failed"],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "ExecutionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_item_count": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "environment_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "environment_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "item_count": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "$ref": "#/components/schemas/RelativeLink"
+              }
+            },
+            "required": ["self"],
+            "type": "object"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_type": {
+            "enum": ["test_case", "suite"],
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "environment_id",
+          "environment_revision_id",
+          "source_type",
+          "source_id",
+          "source_revision_id",
+          "status",
+          "verdict",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "item_count",
+          "completed_item_count",
+          "links"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "immutable pins transactionally resolved",
+          "progress counts terminal items,not passes",
+          "no captured bodies/job counters in history"
+        ]
+      },
+      "FieldError": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "required"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Required",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "type_invalid"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Type invalid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "value_invalid"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Value invalid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "extra_field"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Extra field",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "limit_exceeded"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Limit exceeded",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "duplicate"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Duplicate",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "invalid_uuid"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Invalid uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "invalid_url"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Invalid url",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "invalid_json_pointer"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Invalid json pointer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "invalid_secret_reference"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Invalid secret reference",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "secret_placement_forbidden"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Secret placement forbidden",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "credential_literal_forbidden"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Credential literal forbidden",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "trace_context_forbidden"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Trace context forbidden",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsafe_replay_acknowledgement_required"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsafe replay acknowledgement required",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "incompatible_fields"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Incompatible fields",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "cursor_invalid"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Cursor invalid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "required",
+              "type_invalid",
+              "value_invalid",
+              "extra_field",
+              "limit_exceeded",
+              "duplicate",
+              "invalid_uuid",
+              "invalid_url",
+              "invalid_json_pointer",
+              "invalid_secret_reference",
+              "secret_placement_forbidden",
+              "credential_literal_forbidden",
+              "trace_context_forbidden",
+              "unsafe_replay_acknowledgement_required",
+              "incompatible_fields",
+              "cursor_invalid"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "enum": ["body", "path", "query", "header"],
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          }
+        },
+        "required": ["location", "pointer", "code", "message"],
+        "type": "object",
+        "x-safety": "Fixed safe strings; property/index pointer only; dynamic submitted keys=>*. No raw input/ctx."
+      },
+      "HeaderEqualsAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "maxLength": 8192,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 8192
+          },
+          "header_name": {
+            "$ref": "#/components/schemas/HeaderName",
+            "not": {
+              "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+            }
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "header_equals",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "header_name", "expected"],
+        "type": "object"
+      },
+      "HeaderName": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[!#$%&'*+.^_\\x60|~0-9A-Za-z-]+$",
+        "type": "string",
+        "x-max-utf8-bytes": 128
+      },
+      "HeaderPresentAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "header_name": {
+            "$ref": "#/components/schemas/HeaderName"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "header_present",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "header_name"],
+        "type": "object"
+      },
+      "Hostname": {
+        "description": "Exact lowercase IDNA; no wildcard/port/template/trailing dot; IP uses CIDR.",
+        "maxLength": 253,
+        "minLength": 1,
+        "not": {
+          "pattern": "^[0-9.]+$"
+        },
+        "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$",
+        "type": "string"
+      },
+      "IdempotencyKey": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[\\x21-\\x7e]+$",
+        "type": "string",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future"
+      },
+      "IfMatch": {
+        "description": "One strong quoted token. Missing428; weak/wildcard/multiple/malformed422; valid stale412. Compare atomically.",
+        "maxLength": 1024,
+        "minLength": 2,
+        "pattern": "^\"[\\x21\\x23-\\x7e]*\"$",
+        "type": "string"
+      },
+      "ImportDraft": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "required_configuration": {
+                  "minItems": 1
+                }
+              },
+              "required": ["required_configuration"]
+            },
+            "then": {
+              "properties": {
+                "ready_for_creation": {
+                  "const": false,
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Reviewable proposal only;no credential literals or automatic assertions/baselines/catalog IDs.",
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/CanonicalTestDefinition"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "operation_id": {
+            "$ref": "#/components/schemas/SHA256"
+          },
+          "ready_for_creation": {
+            "type": "boolean"
+          },
+          "required_configuration": {
+            "items": {
+              "enum": [
+                "request_body",
+                "credential_reference",
+                "parameter_mapping"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "required_variables": {
+            "items": {
+              "$ref": "#/components/schemas/VariableName"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "operation_id",
+          "name",
+          "definition",
+          "required_variables",
+          "required_configuration",
+          "ready_for_creation"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-milestone": "future"
+      },
+      "ImportIssue": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsupported_source_version"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsupported source version",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "document_shape_invalid"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Document shape invalid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "document_limit_exceeded"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Document limit exceeded",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "external_reference_forbidden"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "External reference forbidden",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "reference_cycle"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Reference cycle",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "reference_missing"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Reference missing",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsupported_method"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsupported method",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsupported_parameter"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsupported parameter",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "parameter_mapping_required"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Parameter mapping required",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "request_body_required"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Request body required",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "credential_reference_required"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Credential reference required",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsupported_serialization"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsupported serialization",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "unsafe_path"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Unsafe path",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "const": "name_limit_exceeded"
+                }
+              },
+              "required": ["code"]
+            },
+            "then": {
+              "properties": {
+                "message": {
+                  "const": "Name limit exceeded",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "unsupported_source_version",
+              "document_shape_invalid",
+              "document_limit_exceeded",
+              "external_reference_forbidden",
+              "reference_cycle",
+              "reference_missing",
+              "unsupported_method",
+              "unsupported_parameter",
+              "parameter_mapping_required",
+              "request_body_required",
+              "credential_reference_required",
+              "unsupported_serialization",
+              "unsafe_path",
+              "name_limit_exceeded"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "additionalProperties": false,
+            "properties": {
+              "operation_index": {
+                "anyOf": [
+                  {
+                    "maximum": 199,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "parameter_index": {
+                "anyOf": [
+                  {
+                    "maximum": 127,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "section": {
+                "enum": [
+                  "root",
+                  "paths",
+                  "parameters",
+                  "request_body",
+                  "references"
+                ],
+                "type": "string"
+              }
+            },
+            "required": ["section", "operation_index", "parameter_index"],
+            "type": "object"
+          },
+          "message": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SHA256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "severity": {
+            "enum": ["warning", "error"],
+            "type": "string"
+          }
+        },
+        "required": ["operation_id", "severity", "code", "location", "message"],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-milestone": "future"
+      },
+      "ImportJSONValue": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "number",
+            "x-max-numeric-token-bytes": 128
+          },
+          {
+            "type": "string"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/ImportJSONValue"
+            },
+            "minItems": 0,
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ImportJSONValue"
+            },
+            "properties": {
+              "$ref": {
+                "maxLength": 2048,
+                "minLength": 2,
+                "pattern": "^#/",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "x-implementation-milestone": "future-import",
+        "x-max-depth": 32,
+        "x-max-total-nodes": 50000,
+        "x-milestone": "future"
+      },
+      "ImportOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/Method"
+          },
+          "operation_id": {
+            "$ref": "#/components/schemas/SHA256"
+          },
+          "path": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string",
+            "x-max-utf8-bytes": 2048
+          },
+          "selectable": {
+            "type": "boolean"
+          },
+          "supported": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operation_id",
+          "method",
+          "path",
+          "supported",
+          "selectable"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-milestone": "future"
+      },
+      "ImportPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "drafts": {
+            "items": {
+              "$ref": "#/components/schemas/ImportDraft"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ImportIssue"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "issues_truncated": {
+            "type": "boolean"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ImportOperation"
+            },
+            "maxItems": 200,
+            "minItems": 0,
+            "type": "array"
+          },
+          "persisted": {
+            "const": false,
+            "type": "boolean"
+          },
+          "review_required": {
+            "const": true,
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "source_format": {
+            "const": "openapi",
+            "type": "string"
+          },
+          "source_version": {
+            "enum": ["3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.1.0", "3.1.1"],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "source_format",
+          "source_version",
+          "operations",
+          "drafts",
+          "issues",
+          "issues_truncated",
+          "review_required",
+          "persisted"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-max-encoded-utf8-bytes": 2097152,
+        "x-milestone": "future",
+        "x-product-approval-required": true,
+        "x-safety": "Future local-document preview only. No fetching/remote refs/persistence/activation/dispatch or registered route."
+      },
+      "ImportPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/OpenAPISourceDocument"
+          },
+          "name_prefix": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Name"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "selected_operation_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SHA256"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": ["document"],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-milestone": "future"
+      },
+      "InputTimestamp": {
+        "format": "date-time",
+        "maxLength": 27,
+        "minLength": 20,
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$",
+        "type": "string",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future"
+      },
+      "ItemStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "indeterminate",
+          "failed",
+          "skipped"
+        ],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "JSONAbsentAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "json_absent",
+            "type": "string"
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "pointer"],
+        "type": "object"
+      },
+      "JSONBody": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "json",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+          }
+        },
+        "required": ["kind", "value"],
+        "type": "object"
+      },
+      "JSONEqualsAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "$ref": "#/components/schemas/JSONValue"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "json_equals",
+            "type": "string"
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "pointer", "expected"],
+        "type": "object"
+      },
+      "JSONPointer": {
+        "maxLength": 1024,
+        "minLength": 0,
+        "pattern": "^(?:/(?:[^~]|~[01])*)*$",
+        "type": "string",
+        "x-max-utf8-bytes": 1024
+      },
+      "JSONPresentAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "json_present",
+            "type": "string"
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "pointer"],
+        "type": "object"
+      },
+      "JSONSelector": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "normalizer": {
+            "$ref": "#/components/schemas/Normalizer",
+            "default": {
+              "name": "none",
+              "version": 1
+            }
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "pointer"],
+        "type": "object"
+      },
+      "JSONTypeAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_type": {
+            "enum": ["null", "boolean", "number", "string", "array", "object"],
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "json_type",
+            "type": "string"
+          },
+          "pointer": {
+            "$ref": "#/components/schemas/JSONPointer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "pointer", "expected_type"],
+        "type": "object"
+      },
+      "JSONValue": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalNumber"
+          },
+          {
+            "maxLength": 65536,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 65536
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/JSONValue"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JSONValue"
+            },
+            "maxProperties": 256,
+            "propertyNames": {
+              "not": {
+                "const": "$secret"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "x-max-depth": 32
+      },
+      "JSONValueWithSecretLeaves": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalNumber"
+          },
+          {
+            "maxLength": 65536,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 65536
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+            },
+            "maxProperties": 256,
+            "propertyNames": {
+              "not": {
+                "const": "$secret"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "$ref": "#/components/schemas/SecretReference"
+          }
+        ],
+        "x-max-depth": 32
+      },
+      "ListQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "Method": {
+        "enum": ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+        "type": "string"
+      },
+      "Name": {
+        "description": "Normalize before 1..120 code-point bounds; case-sensitive equality.",
+        "maxLength": 120,
+        "minLength": 1,
+        "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+        "type": "string",
+        "x-normalization": ["NFC", "trim_outer_spaces"]
+      },
+      "NoneNormalizer": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "none",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "version"],
+        "type": "object"
+      },
+      "Normalizer": {
+        "description": "Validate named versioned policy in M2 only. Invalid runtime input yields explicit error;M4 verdict mapping unresolved.",
+        "discriminator": {
+          "propertyName": "name",
+          "mapping": {
+            "none": "#/components/schemas/NoneNormalizer",
+            "sort_scalar_array": "#/components/schemas/SortScalarArrayNormalizer",
+            "round_decimal": "#/components/schemas/RoundDecimalNormalizer"
+          }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/NoneNormalizer"
+          },
+          {
+            "$ref": "#/components/schemas/SortScalarArrayNormalizer"
+          },
+          {
+            "$ref": "#/components/schemas/RoundDecimalNormalizer"
+          }
+        ]
+      },
+      "OpenAPISourceDocument": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ImportJSONValue"
+        },
+        "description": "OpenAPI source dictionary intentionally supports metadata;not extra Sentinel envelope properties. Ignore examples/defaults/security/servers in generation.",
+        "properties": {
+          "info": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ImportJSONValue"
+            },
+            "type": "object"
+          },
+          "openapi": {
+            "enum": ["3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.1.0", "3.1.1"],
+            "type": "string"
+          },
+          "paths": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ImportJSONValue"
+            },
+            "maxProperties": 200,
+            "type": "object"
+          }
+        },
+        "required": ["openapi", "info", "paths"],
+        "type": "object",
+        "x-implementation-milestone": "future-import",
+        "x-max-encoded-utf8-bytes": 1048576,
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "supported OAS structure",
+          "operations<=200;parameters<=128;local refs<=1000;depth<=32",
+          "no cycles/remote refs/fetch/persistence"
+        ]
+      },
+      "Problem": {
+        "additionalProperties": false,
+        "description": "RFC9457. errors optional validation-only, omitted otherwise; preserve M1 shape. No detail/instance/raw input.",
+        "oneOf": [
+          {
+            "properties": {
+              "code": {
+                "const": "validation_failed"
+              },
+              "status": {
+                "const": 422
+              },
+              "title": {
+                "const": "Request validation failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:validation_failed"
+              }
+            }
+          },
+          {
+            "properties": {
+              "code": {
+                "const": "secret_reference_invalid"
+              },
+              "status": {
+                "const": 422
+              },
+              "title": {
+                "const": "Secret reference invalid"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:secret_reference_invalid"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "resource_not_found"
+              },
+              "status": {
+                "const": 404
+              },
+              "title": {
+                "const": "Request failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:resource_not_found"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "revision_conflict"
+              },
+              "status": {
+                "const": 412
+              },
+              "title": {
+                "const": "Revision conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:revision_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "revision_precondition_required"
+              },
+              "status": {
+                "const": 428
+              },
+              "title": {
+                "const": "Revision precondition required"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:revision_precondition_required"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "resource_conflict"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Resource conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:resource_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "request_too_large"
+              },
+              "status": {
+                "const": 413
+              },
+              "title": {
+                "const": "Request too large"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:request_too_large"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "unsupported_media_type"
+              },
+              "status": {
+                "const": 415
+              },
+              "title": {
+                "const": "Unsupported media type"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:unsupported_media_type"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "authentication_required"
+              },
+              "status": {
+                "const": 401
+              },
+              "title": {
+                "const": "Authentication required"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:authentication_required"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "forbidden_origin"
+              },
+              "status": {
+                "const": 403
+              },
+              "title": {
+                "const": "Forbidden origin"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:forbidden_origin"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "idempotency_conflict"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Idempotency conflict"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:idempotency_conflict"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "baseline_ineligible"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Baseline ineligible"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:baseline_ineligible"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "baseline_incompatible"
+              },
+              "status": {
+                "const": 409
+              },
+              "title": {
+                "const": "Baseline incompatible"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:baseline_incompatible"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "internal_error"
+              },
+              "status": {
+                "const": 500
+              },
+              "title": {
+                "const": "Internal server error"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:internal_error"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": ["errors"]
+            },
+            "properties": {
+              "code": {
+                "const": "http_error"
+              },
+              "status": {
+                "const": 405
+              },
+              "title": {
+                "const": "Request failed"
+              },
+              "type": {
+                "const": "urn:sentinel:problem:http_error"
+              }
+            }
+          }
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "validation_failed",
+              "secret_reference_invalid",
+              "resource_not_found",
+              "revision_conflict",
+              "revision_precondition_required",
+              "resource_conflict",
+              "request_too_large",
+              "unsupported_media_type",
+              "authentication_required",
+              "forbidden_origin",
+              "idempotency_conflict",
+              "baseline_ineligible",
+              "baseline_incompatible",
+              "internal_error",
+              "http_error"
+            ],
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 400,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "format": "uri",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["type", "title", "status", "code"],
+        "type": "object",
+        "x-milestone-future-codes": [
+          "idempotency_conflict",
+          "baseline_ineligible",
+          "baseline_incompatible"
+        ]
+      },
+      "Project": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "deleted_at": {
+            "description": "M2 deletion excluded.",
+            "type": "null"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "required": ["id", "name", "created_at", "deleted_at"],
+        "type": "object"
+      },
+      "ProjectCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "ProjectPage": {
+        "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "QueryParameter": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[^\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 128
+          },
+          "value": {
+            "maxLength": 4096,
+            "minLength": 0,
+            "pattern": "^[^\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 4096
+          }
+        },
+        "required": ["name", "value"],
+        "type": "object"
+      },
+      "Redaction": {
+        "additionalProperties": false,
+        "description": "Additional response protections;cannot disable fixed credential redaction.",
+        "properties": {
+          "header_names": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HeaderName"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "json_pointers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JSONPointer"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object",
+        "x-semantic-validation": [
+          "normalized header uniqueness",
+          "canonical set sorting"
+        ]
+      },
+      "RelativeLink": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "pattern": "^/api/v1/[^\\u0000-\\u0020\\u007f]*$",
+        "type": "string"
+      },
+      "Request": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestBody"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "connect_timeout_ms": {
+            "default": 5000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "follow_redirects": {
+            "default": false,
+            "type": "boolean"
+          },
+          "headers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RequestHeader"
+            },
+            "maxItems": 64,
+            "minItems": 0,
+            "type": "array"
+          },
+          "max_redirects": {
+            "default": 3,
+            "maximum": 3,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max_response_bytes": {
+            "default": 262144,
+            "maximum": 1048576,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "method": {
+            "$ref": "#/components/schemas/Method"
+          },
+          "path": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^/(?!/)[^?#\\\\\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048
+          },
+          "query": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/QueryParameter"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "read_timeout_ms": {
+            "default": 10000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeout_ms": {
+            "default": 30000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "verify_tls": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": ["method", "path"],
+        "type": "object",
+        "x-semantic-validation": [
+          "connect/read<=total",
+          "headers aggregate<=32768 bytes;unique normalized name",
+          "exact variable template grammar only",
+          "path no authority/dot segment;append below base prefix",
+          "limits may be lowered by deployment",
+          "TLS opt-out runtime policy needs M3 review"
+        ]
+      },
+      "RequestBody": {
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "json": "#/components/schemas/JSONBody",
+            "text": "#/components/schemas/TextBody"
+          }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JSONBody"
+          },
+          {
+            "$ref": "#/components/schemas/TextBody"
+          }
+        ]
+      },
+      "RequestHeader": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "not": {
+              "properties": {
+                "name": {
+                  "pattern": "^(?:[tT][rR][aA][cC][eE][pP][aA][rR][eE][nN][tT]|[tT][rR][aA][cC][eE][sS][tT][aA][tT][eE]|[hH][oO][sS][tT]|[cC][oO][nN][tT][eE][nN][tT]-[lL][eE][nN][gG][tT][hH]|[tT][rR][aA][nN][sS][fF][eE][rR]-[eE][nN][cC][oO][dD][iI][nN][gG]|[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[uU][pP][gG][rR][aA][dD][eE]|[pP][rR][oO][xX][yY]-[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[tT][rR][aA][iI][lL][eE][rR]|[tT][eE]|[eE][xX][pP][eE][cC][tT])$"
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+                }
+              },
+              "required": ["name"]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/SecretReference"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^[bB][aA][gG][gG][aA][gG][eE]$"
+                }
+              },
+              "required": ["name"]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "pattern": "(^|,)\\s*(?:[sS][eE][nN][tT][iI][nN][eE][lL]\\.[eE][xX][eE][cC][uU][tT][iI][oO][nN]\\.[iI][dD]|[sS][eE][nN][tT][iI][nN][eE][lL]\\.[aA][tT][tT][eE][mM][pP][tT]\\.[iI][dD])\\s*="
+                      }
+                    },
+                    {
+                      "not": {
+                        "pattern": "\\{\\{|\\}\\}"
+                      }
+                    }
+                  ],
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "pattern": "^[\\x20-\\x7e]*$",
+                  "type": "string",
+                  "x-max-utf8-bytes": 4096
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/HeaderName"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "maxLength": 8192,
+                "minLength": 0,
+                "pattern": "^[^\\u0000\\r\\n]*$",
+                "type": "string",
+                "x-max-utf8-bytes": 8192
+              },
+              {
+                "$ref": "#/components/schemas/SecretReference"
+              }
+            ]
+          }
+        },
+        "required": ["name", "value"],
+        "type": "object",
+        "x-semantic-validation": [
+          "case-insensitive unique names",
+          "deployment credential variants require tags",
+          "decode owned baggage keys;W3C<=32 members;valid percent encoding"
+        ]
+      },
+      "ResponseHeader": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+                }
+              },
+              "required": ["name"]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "const": "[REDACTED]",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/CanonicalHeaderName"
+          },
+          "value": {
+            "maxLength": 8192,
+            "minLength": 0,
+            "pattern": "^[^\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 8192
+          }
+        },
+        "required": ["name", "value"],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "operator/deployment sensitive variants similarly redacted"
+        ]
+      },
+      "ResponseObservation": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "body": {
+                  "maxLength": 1048576,
+                  "minLength": 0,
+                  "type": "string",
+                  "x-max-utf8-bytes": 1048576
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "body_kind": {
+                  "const": "omitted"
+                }
+              },
+              "required": ["body_kind"]
+            },
+            "then": {
+              "properties": {
+                "body": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "redaction_unavailable": {
+                  "const": true
+                }
+              },
+              "required": ["redaction_unavailable"]
+            },
+            "then": {
+              "properties": {
+                "body": {
+                  "type": "null"
+                },
+                "body_kind": {
+                  "const": "omitted",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Redacted JSON/text serialized as string preserves decimal tokens;JSON null is string null. Source captured_bytes differs from redacted serialization size.",
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 1048576,
+                "minLength": 0,
+                "type": "string",
+                "x-max-utf8-bytes": 1048576
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body_kind": {
+            "$ref": "#/components/schemas/BodyKind"
+          },
+          "captured_bytes": {
+            "maximum": 1048576,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseHeader"
+            },
+            "maxItems": 64,
+            "minItems": 0,
+            "type": "array"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "recorded_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "redaction_unavailable": {
+            "type": "boolean"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "maximum": 599,
+                "minimum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "status_code",
+          "headers",
+          "body_kind",
+          "body",
+          "captured_bytes",
+          "truncated",
+          "redaction_unavailable",
+          "recorded_at",
+          "expires_at"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M3",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "headers aggregate<=32768 bytes",
+          "redact before storage/logs;bounded output"
+        ]
+      },
+      "RevisionAfter": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": ["version", "id"],
+        "type": "object"
+      },
+      "RoundDecimalNormalizer": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "round_decimal",
+            "type": "string"
+          },
+          "rounding": {
+            "const": "half_even",
+            "type": "string"
+          },
+          "scale": {
+            "maximum": 12,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "version": {
+            "const": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "version", "scale", "rounding"],
+        "type": "object"
+      },
+      "SHA256": {
+        "maxLength": 64,
+        "minLength": 64,
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "SecretName": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+        "type": "string"
+      },
+      "SecretReference": {
+        "additionalProperties": false,
+        "properties": {
+          "$secret": {
+            "$ref": "#/components/schemas/SecretName"
+          }
+        },
+        "required": ["$secret"],
+        "type": "object"
+      },
+      "Severity": {
+        "enum": ["required", "advisory"],
+        "type": "string"
+      },
+      "SortScalarArrayNormalizer": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "sort_scalar_array",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "version"],
+        "type": "object"
+      },
+      "SpanID": {
+        "maxLength": 16,
+        "minLength": 16,
+        "not": {
+          "const": "0000000000000000"
+        },
+        "pattern": "^[0-9a-f]{16}$",
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "StatusCodeAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_codes": {
+            "items": {
+              "maximum": 599,
+              "minimum": 100,
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "status_code",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "expected_codes"],
+        "type": "object"
+      },
+      "SuiteDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision": {
+            "$ref": "#/components/schemas/SuiteRevision"
+          },
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "pointer equals revision.id;revision owner equals identity.id"
+        ]
+      },
+      "SuitePage": {
+        "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteSummary"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "SuiteRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteRevisionItem"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "suite_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "suite_id",
+          "version",
+          "schema_version",
+          "items",
+          "created_at"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "contiguous ordinals0..n-1",
+          "unique case membership"
+        ]
+      },
+      "SuiteRevisionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "ordinal": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "test_case_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "test_case_revision_version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "ordinal",
+          "test_case_id",
+          "test_case_revision_id",
+          "test_case_revision_version"
+        ],
+        "type": "object"
+      },
+      "SuiteSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "active_revision_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision_version"
+        ],
+        "type": "object"
+      },
+      "SuiteWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "test_case_revision_ids": {
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": ["name", "test_case_revision_ids"],
+        "type": "object",
+        "x-semantic-validation": [
+          "same project",
+          "one test-case membership even across different revisions",
+          "exact revision pins in input order"
+        ]
+      },
+      "TargetPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_ports": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 128,
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "denied_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "denied_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object",
+        "x-semantic-validation": [
+          "deployment deny wins",
+          "ports only narrow deployment",
+          "explicit allow exceptions for blocked addresses",
+          "static syntax only;future worker DNS/address checks"
+        ]
+      },
+      "TestCaseDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision": {
+            "$ref": "#/components/schemas/TestCaseRevision"
+          },
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "pointer equals revision.id;revision owner equals identity.id"
+        ]
+      },
+      "TestCasePage": {
+        "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TestCaseSummary"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "TestCaseRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/CanonicalTestDefinition"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "policy_fingerprint": {
+            "$ref": "#/components/schemas/SHA256"
+          },
+          "schema_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "test_case_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "unsafe_replay_acknowledged_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "test_case_id",
+          "version",
+          "schema_version",
+          "definition",
+          "policy_fingerprint",
+          "unsafe_replay_acknowledged_at",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "TestCaseRevisionPage": {
+        "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TestCaseRevision"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "TestCaseSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "active_revision_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "active_revision_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "active_revision_id",
+          "created_at",
+          "updated_at",
+          "active_revision_version"
+        ],
+        "type": "object"
+      },
+      "TestCaseWrite": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "unsafe_replay_acknowledgement": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "definition": {
+                  "properties": {
+                    "allow_unsafe_replay": {
+                      "const": true
+                    }
+                  },
+                  "required": ["allow_unsafe_replay"]
+                }
+              },
+              "required": ["definition"]
+            },
+            "then": {
+              "properties": {
+                "unsafe_replay_acknowledgement": {
+                  "const": "duplicate_effects_possible",
+                  "type": "string"
+                }
+              },
+              "required": ["unsafe_replay_acknowledgement"]
+            }
+          }
+        ],
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/TestDefinition"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "unsafe_replay_acknowledgement": {
+            "anyOf": [
+              {
+                "const": "duplicate_effects_possible",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": ["name", "definition"],
+        "type": "object"
+      },
+      "TestDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_unsafe_replay": {
+            "default": false,
+            "type": "boolean"
+          },
+          "assertions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Assertion"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array"
+          },
+          "comparison_policy": {
+            "$ref": "#/components/schemas/ComparisonPolicy",
+            "default": {
+              "exact_text_body": false,
+              "performance_threshold_ms": null,
+              "schema_version": 1,
+              "selectors": [],
+              "text_body_selector": null
+            }
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/Redaction",
+            "default": {
+              "header_names": [],
+              "json_pointers": [],
+              "schema_version": 1
+            }
+          },
+          "request": {
+            "$ref": "#/components/schemas/Request"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["request"],
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144,
+        "x-max-depth": 32
+      },
+      "TextBody": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "text",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 131072,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 131072
+          }
+        },
+        "required": ["kind", "value"],
+        "type": "object"
+      },
+      "TextEqualsAssertion": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "maxLength": 131072,
+            "minLength": 0,
+            "type": "string",
+            "x-max-utf8-bytes": 131072
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "text_equals",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity", "kind", "expected"],
+        "type": "object"
+      },
+      "TextSelector": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": ["id", "severity"],
+        "type": "object"
+      },
+      "Timestamp": {
+        "format": "date-time",
+        "maxLength": 27,
+        "minLength": 27,
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$",
+        "type": "string"
+      },
+      "TraceID": {
+        "maxLength": 32,
+        "minLength": 32,
+        "not": {
+          "const": "00000000000000000000000000000000"
+        },
+        "pattern": "^[0-9a-f]{32}$",
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "TraceReference": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "correlation_source": {
+                  "const": "baggage_attribute_search",
+                  "type": "string"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "relation": {
+                  "const": "primary"
+                }
+              },
+              "required": ["relation"]
+            },
+            "then": {
+              "properties": {
+                "correlation_source": {
+                  "const": "sentinel_context",
+                  "type": "string"
+                },
+                "span_id": {
+                  "$ref": "#/components/schemas/SpanID"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "correlation_source": {
+            "$ref": "#/components/schemas/CorrelationSource"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "first_checked_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tempo_unavailable",
+                  "trace_not_found",
+                  "client_span_missing",
+                  "context_incomplete",
+                  "lookup_expired"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "relation": {
+            "$ref": "#/components/schemas/TraceRelation"
+          },
+          "span_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpanID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TraceStatus"
+          },
+          "tempo_url": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "maxLength": 2048,
+                "minLength": 1,
+                "pattern": "^https?://",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trace_id": {
+            "$ref": "#/components/schemas/TraceID"
+          }
+        },
+        "required": [
+          "id",
+          "relation",
+          "trace_id",
+          "span_id",
+          "correlation_source",
+          "status",
+          "first_checked_at",
+          "last_checked_at",
+          "deadline_at",
+          "last_error_code",
+          "tempo_url"
+        ],
+        "type": "object",
+        "x-implementation-milestone": "M5",
+        "x-milestone": "future",
+        "x-semantic-validation": [
+          "one primary per dispatch",
+          "terminal deadline default+60000ms",
+          "safe configured UI-origin/trace-only pattern",
+          "trace status never changes verdict"
+        ]
+      },
+      "TraceRelation": {
+        "enum": ["primary", "linked"],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "TraceStatus": {
+        "enum": [
+          "pending",
+          "missing",
+          "available",
+          "partial",
+          "tempo_unavailable",
+          "expired"
+        ],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "TransportOutcome": {
+        "enum": [
+          "response_received",
+          "dns_failure",
+          "connect_timeout",
+          "read_timeout",
+          "total_timeout",
+          "tls_failure",
+          "connection_failure",
+          "target_denied",
+          "redirect_denied",
+          "response_limit_exceeded",
+          "indeterminate"
+        ],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "UUID": {
+        "format": "uuid",
+        "maxLength": 36,
+        "minLength": 36,
+        "not": {
+          "const": "00000000-0000-0000-0000-000000000000"
+        },
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "VariableName": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+        "type": "string"
+      },
+      "Verdict": {
+        "enum": [
+          "passed",
+          "functional_regression",
+          "performance_warning",
+          "observed_change",
+          "inconclusive",
+          "baseline_required",
+          "not_evaluated"
+        ],
+        "type": "string",
+        "x-implementation-milestone": "M3-M5",
+        "x-milestone": "future"
+      },
+      "Version": {
+        "maximum": 2147483647,
+        "minimum": 1,
+        "type": "integer"
+      }
+    }
+  },
+  "info": {
+    "description": "Design artifact only. Actual runtime health API/probe persistence unchanged;no catalog/future business feature implemented.",
+    "title": "Sentinel planned M2 boundary contracts",
+    "version": "0.1.0-planned"
+  },
+  "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/environments/{environment_id}": {
+      "get": {
+        "operationId": "get_environment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/environment_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "get environment",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "patch": {
+        "operationId": "update_environment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/environment_id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentPatch"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem428"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "update environment",
+        "tags": ["catalog"],
+        "x-concurrency": "Locked/CAS identity;atomic revision/change/pointer;one stale-update loser412.",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "list_projects",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPage"
+                }
+              }
+            },
+            "description": "Planned catalog response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "list projects",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-pagination": {
+          "max_encoded_utf8_bytes": 1048576,
+          "order": "ascending",
+          "snapshot_guarantee": false,
+          "sort": ["created_at", "id"]
+        },
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "post": {
+        "operationId": "create_project",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "create project",
+        "tags": ["catalog"],
+        "x-if-match-on-create": "Forbidden;422 incompatible_fields",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "operationId": "get_project",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "get project",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/projects/{project_id}/environments": {
+      "get": {
+        "operationId": "list_environments",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentPage"
+                }
+              }
+            },
+            "description": "Planned catalog response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "list environments",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-pagination": {
+          "max_encoded_utf8_bytes": 1048576,
+          "order": "ascending",
+          "snapshot_guarantee": false,
+          "sort": ["created_at", "id"]
+        },
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "post": {
+        "operationId": "create_environment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentCreate"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "create environment",
+        "tags": ["catalog"],
+        "x-if-match-on-create": "Forbidden;422 incompatible_fields",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/projects/{project_id}/suites": {
+      "get": {
+        "operationId": "list_suites",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuitePage"
+                }
+              }
+            },
+            "description": "Planned catalog response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "list suites",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-pagination": {
+          "max_encoded_utf8_bytes": 1048576,
+          "order": "ascending",
+          "snapshot_guarantee": false,
+          "sort": ["created_at", "id"]
+        },
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "post": {
+        "operationId": "create_suite",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteWrite"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "create suite",
+        "tags": ["catalog"],
+        "x-if-match-on-create": "Forbidden;422 incompatible_fields",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/projects/{project_id}/test-cases": {
+      "get": {
+        "operationId": "list_test_cases",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCasePage"
+                }
+              }
+            },
+            "description": "Planned catalog response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "list test cases",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-pagination": {
+          "max_encoded_utf8_bytes": 1048576,
+          "order": "ascending",
+          "snapshot_guarantee": false,
+          "sort": ["created_at", "id"]
+        },
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "post": {
+        "operationId": "create_test_case",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project_id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCaseWrite"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCaseDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "create test case",
+        "tags": ["catalog"],
+        "x-if-match-on-create": "Forbidden;422 incompatible_fields",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/suites/{suite_id}": {
+      "get": {
+        "operationId": "get_suite",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/suite_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "get suite",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "put": {
+        "operationId": "revise_suite",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/suite_id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteWrite"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem428"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "revise suite",
+        "tags": ["catalog"],
+        "x-concurrency": "Locked/CAS identity;atomic revision/change/pointer;one stale-update loser412.",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/test-cases/{test_case_id}": {
+      "get": {
+        "operationId": "get_test_case",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/test_case_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCaseDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "get test case",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      },
+      "put": {
+        "operationId": "revise_test_case",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/test_case_id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCaseWrite"
+              }
+            }
+          },
+          "required": true,
+          "x-max-utf8-bytes": 524288
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCaseDetail"
+                }
+              }
+            },
+            "description": "Planned catalog response",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem428"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "revise test case",
+        "tags": ["catalog"],
+        "x-concurrency": "Locked/CAS identity;atomic revision/change/pointer;one stale-update loser412.",
+        "x-milestone": "M2",
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    },
+    "/api/v1/test-cases/{test_case_id}/revisions": {
+      "get": {
+        "operationId": "list_test_case_revisions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/test_case_id"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCaseRevisionPage"
+                }
+              }
+            },
+            "description": "Planned catalog response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem500"
+          }
+        },
+        "summary": "list test case revisions",
+        "tags": ["catalog"],
+        "x-milestone": "M2",
+        "x-pagination": {
+          "max_encoded_utf8_bytes": 1048576,
+          "order": "ascending",
+          "snapshot_guarantee": false,
+          "sort": ["version", "id"]
+        },
+        "x-query-extra-fields": "reject",
+        "x-sentinel-status": "planned; not runtime"
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Planned M2 only",
+      "name": "catalog"
+    }
+  ],
+  "x-authentication": "Existing settings-based bearer guard when configured;remote bind token required;no new auth/tenant model.",
+  "x-design-document": "docs/implementation/milestone-2.md",
+  "x-future-components-only": true,
+  "x-runtime-openapi-authoritative": "frontend/openapi.json",
+  "x-schema-limitations": [
+    "UTF8 bytes/depth/aggregate limits/decimal token precision require service validation",
+    "normalization precedes field limits;defaults are annotations",
+    "cursor decode/scope,ownership/ordinal/case uniqueness and ETag races require application/PostgreSQL tests",
+    "future normalizer verdict,baseline bootstrap/selection,transport checkpoint and historical attempts continuation remain open"
+  ],
+  "x-sentinel-status": "planned; not runtime"
+}

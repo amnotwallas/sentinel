@@ -90,8 +90,10 @@ uv run --env-file .env --project backend python -m sentinel.worker.smoke
 Native API binding defaults to `127.0.0.1`; non-loopback binding requires a bearer
 token. The native worker is one process with one active handler. The API and
 worker import the same installed package. Neither runs schema migrations
-automatically. Readiness returns `503` when PostgreSQL or migration `0001` is
-unavailable. Run migrations explicitly before starting workers.
+automatically. Readiness compares the database revisions with the single head in
+the deployed Alembic migration graph. It returns `503` for missing or mismatched
+revisions, missing/ambiguous migration assets, or a connection failure. Run
+migrations explicitly before starting workers; readiness never executes them.
 
 ## Frontend development
 
@@ -184,6 +186,12 @@ contract contains only health endpoints.
 GitHub Actions runs backend lint/type/tests with PostgreSQL, migration
 up/down/drift checks, frontend checks/build, contract generation, rendered Compose
 port validation, and a full Compose worker smoke run.
+
+For local feedback, `make setup` installs locked dependencies and `make check-fast`
+runs backend non-integration, frontend, developer-tooling and non-mutating contract
+checks. See [quality gates](docs/development/quality-gates.md) for PostgreSQL and
+Docker acceptance, [development workflow](docs/development/workflow.md) for agent
+ownership/worktrees, and [Milestone 2 planning](docs/development/milestone-2-plan.md).
 
 ## Operations and limitations
 
