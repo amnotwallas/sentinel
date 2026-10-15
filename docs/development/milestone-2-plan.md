@@ -1,11 +1,15 @@
 # Milestone 2 task plan
 
-Milestone 2 implementation is in progress. The schema-readiness prerequisite and
-project API are integrated; the versioned environment API is the current candidate. Scope and exit
-criteria come from [ROADMAP.md](../ROADMAP.md#milestone-2-versioned-catalog-and-definition-api),
+Milestone 2 implementation is in progress. The schema-readiness prerequisite,
+project API, versioned environment API, typed-client acceptance coverage, and test
+definition policy are integrated. Scope and exit criteria come from
+[ROADMAP.md](../ROADMAP.md#milestone-2-versioned-catalog-and-definition-api),
 with endpoint inventory in [MVP.md](../MVP.md#api-acceptance-contract). The accepted
 [architecture](../architecture/README.md) and ADRs remain unchanged. Milestone 1
-is accepted per the user's CI confirmation; remote run metadata is not recorded yet.
+is accepted per the user's CI confirmation. M2-03 is integrated on `main` as
+`fc9c3aa46838fa2b6f754f8973990d5480b8bede`; the user confirmed Actions run #3
+completed successfully in 1 minute 18 seconds. The run URL and individual backend
+and Compose job details are not recorded yet.
 
 ## Decisions before compatibility surfaces
 
@@ -127,8 +131,11 @@ writes client-consumption tests/source, not generated artifacts.
 - **Tests:** Immutable revisions, malformed/static policy, two independent PostgreSQL
   update transactions, rollback, scoped ownership, canary errors/logs/persistence,
   exact MVP endpoint contracts, migrations and generated types.
-- **Status:** Implemented and locally verified as the current integration candidate;
-  merge, push, and remote CI verification remain pending.
+- **Status:** Integrated on `main` as
+  `fc9c3aa46838fa2b6f754f8973990d5480b8bede`. GitHub Actions run #3 is
+  user-confirmed successful in 1 minute 18 seconds, with 2 passing frontend Vitest
+  files and 4 passing tests; the run URL and individual backend and Compose job
+  details remain to be captured.
 - **Parallel:** Frontend M2-04 and QA review of the project slice can run concurrently.
   Pure test-document validation could be split with a new explicit writer, but the
   default model keeps one backend writer and avoids overlapping security modules.
@@ -150,6 +157,11 @@ writes client-consumption tests/source, not generated artifacts.
   format and build. Use synthetic references without environment lookup.
 - **Parallel:** Yes, against a frozen generated contract while backend builds the
   next slice. Suspend edits during shared contract regeneration/handoff.
+- **Status:** Integrated on `main` as
+  `7783038965a007c9b80234565be467faaca49afb`, with local runtime acceptance
+  coverage for typed project/environment reads, pagination, ETag/Location access,
+  If-Match transmission, stale-update problem responses, frontend quality gates,
+  and generated-contract drift. Remote CI verification remains pending.
 
 ### M2-05 — Validate a test definition and return safe boundary errors
 
@@ -174,6 +186,12 @@ writes client-consumption tests/source, not generated artifacts.
 - **Parallel:** QA M2-08 can prepare adversarial cases from agreed schemas; no
   second writer modifies the same policy module. Optional pure-policy split needs
   separate files, explicit ports and a slot freed by another role.
+- **Status:** Integrated on `main` as
+  `46083d7e84bbb224e4f8de7f0f41c9844e86fc31`, with strict canonical validation,
+  separated security/regression ownership, stable fixture fingerprints,
+  security-focused unit coverage, and 39 passing PostgreSQL integration tests.
+  Acceptance remains open until backend, frontend, and Compose remote CI pass on
+  the resulting `main` SHA. Persistence use by M2-06 remains future work.
 
 ### M2-06 — Immutable test-case API and revision history
 

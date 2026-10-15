@@ -40,8 +40,18 @@ PostgreSQL named-volume persistence across restart/replacement. The implementati
 was committed and pushed to `amnotwallas/sentinel` on `main` as
 `62635ea71566dc8e21118667a393ed944f6a0cce`. The user confirmed all GitHub Actions
 backend, frontend, and Compose jobs passed. The run URL/logs were not independently
-captured in this checkout; this CI status is user-reported. Milestone 2 has not
-started; its proposed task breakdown is in [the development plan](development/milestone-2-plan.md).
+captured in this checkout; this CI status is user-reported. Milestone 2 is in
+progress. M2-00 through M2-05 are integrated on `main`; M2-03 is commit
+`fc9c3aa46838fa2b6f754f8973990d5480b8bede`. The user confirmed GitHub Actions
+run #3 completed successfully in 1 minute 18 seconds, including a frontend Vitest
+summary of 2 passing files and 4 passing tests. The run URL and individual backend
+and Compose job details have not been independently captured. M2-04 typed-client
+coverage is integrated as `7783038965a007c9b80234565be467faaca49afb` and M2-05
+definition validation is integrated as
+`46083d7e84bbb224e4f8de7f0f41c9844e86fc31`. Their local integration gates pass;
+M2-05 acceptance remains open until backend, frontend, and Compose remote CI pass
+on the resulting `main` SHA. The remaining task breakdown is in
+[the development plan](development/milestone-2-plan.md).
 
 ### Goal
 
