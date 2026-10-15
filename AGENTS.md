@@ -20,6 +20,11 @@ Successful checks do not grant commit, push, merge, or remote-setting permission
 Use `docs/implementation/milestone-2.md` and its planned schema for M2 contracts;
 runtime generated artifacts describe implemented routes only.
 
+Within an approved milestone and task scope, agents may implement, test, and
+document changes without requesting confirmation for routine decisions. Explicit
+authorization remains required for commits, pushes, merges, remote changes,
+destructive operations, and modifications to accepted architectural contracts.
+
 ## Product boundaries
 
 Sentinel is an open-source, self-hosted API reliability and distributed tracing
