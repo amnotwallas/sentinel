@@ -210,6 +210,13 @@ writes client-consumption tests/source, not generated artifacts.
   history/pagination, canaries in database/logs/errors; migration round trip and
   contract generation. Request-only changes must not alter policy fingerprints.
 - **Parallel:** Frontend extends environment client tests; QA reviews M2-03/05.
+- **Status:** Integrated on `main` as
+  `3c50c2bb05f68a15c83df4312f7b1877797ce426`. Local backend, frontend,
+  PostgreSQL, migration, contract, and Compose gates passed; the candidate
+  included 160 non-integration backend tests, 47 PostgreSQL integration tests,
+  and 8 frontend tests. The user confirmed GitHub Actions workflow #5 reported
+  success for this main SHA. M2-06 acceptance is recorded as complete; no
+  execution or target I/O was added.
 
 ### M2-07 — Ordered suites pinned to exact test revisions
 

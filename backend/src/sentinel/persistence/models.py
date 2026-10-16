@@ -83,6 +83,7 @@ class TestCaseRow(Base):
     __tablename__ = "test_cases"
     __table_args__ = (
         CheckConstraint("state_version BETWEEN 1 AND 2147483647", name="test_case_state_version"),
+        UniqueConstraint("id", "project_id", name="uq_test_cases_identity_project"),
         ForeignKeyConstraint(
             ["active_revision_id", "id"],
             ["test_case_revisions.id", "test_case_revisions.test_case_id"],
@@ -115,6 +116,12 @@ class TestCaseRevisionRow(Base):
             name="test_case_replay_ack_shape",
         ),
         UniqueConstraint("id", "test_case_id", name="uq_test_case_revisions_identity_owner"),
+        UniqueConstraint(
+            "id",
+            "test_case_id",
+            "version",
+            name="uq_test_case_revisions_identity_owner_version",
+        ),
         Index("uq_test_case_revisions_version", "test_case_id", "version", unique=True),
         Index("ix_test_case_revisions_history", "test_case_id", "version", "id"),
     )
@@ -127,6 +134,96 @@ class TestCaseRevisionRow(Base):
     unsafe_replay_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     unsafe_replay_acknowledgement: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SuiteRow(Base):
+    __tablename__ = "suites"
+    __table_args__ = (
+        CheckConstraint("state_version BETWEEN 1 AND 2147483647", name="suite_state_version"),
+        UniqueConstraint("id", "project_id", name="uq_suites_identity_project"),
+        ForeignKeyConstraint(
+            ["active_revision_id", "id"],
+            ["suite_revisions.id", "suite_revisions.suite_id"],
+            deferrable=True,
+            initially="DEFERRED",
+            use_alter=True,
+            name="fk_suites_active_revision",
+        ),
+        Index("ix_suites_project_list", "project_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(String(120))
+    active_revision_id: Mapped[UUID]
+    state_version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SuiteRevisionRow(Base):
+    __tablename__ = "suite_revisions"
+    __table_args__ = (
+        CheckConstraint("version BETWEEN 1 AND 2147483647", name="suite_revision_version"),
+        ForeignKeyConstraint(
+            ["suite_id", "project_id"],
+            ["suites.id", "suites.project_id"],
+            ondelete="RESTRICT",
+            name="fk_suite_revisions_suite_project",
+        ),
+        UniqueConstraint("id", "suite_id", name="uq_suite_revisions_identity_owner"),
+        UniqueConstraint("id", "project_id", name="uq_suite_revisions_identity_project"),
+        Index("uq_suite_revisions_version", "suite_id", "version", unique=True),
+        Index("ix_suite_revisions_history", "suite_id", "version", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    suite_id: Mapped[UUID]
+    project_id: Mapped[UUID]
+    version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SuiteRevisionItemRow(Base):
+    __tablename__ = "suite_revision_items"
+    __table_args__ = (
+        CheckConstraint("ordinal BETWEEN 0 AND 99", name="suite_revision_item_ordinal"),
+        CheckConstraint(
+            "test_case_revision_version BETWEEN 1 AND 2147483647",
+            name="suite_revision_item_version",
+        ),
+        ForeignKeyConstraint(
+            ["suite_revision_id", "project_id"],
+            ["suite_revisions.id", "suite_revisions.project_id"],
+            ondelete="RESTRICT",
+            name="fk_suite_revision_items_revision_project",
+        ),
+        ForeignKeyConstraint(
+            ["test_case_id", "project_id"],
+            ["test_cases.id", "test_cases.project_id"],
+            ondelete="RESTRICT",
+            name="fk_suite_revision_items_test_case_project",
+        ),
+        ForeignKeyConstraint(
+            ["test_case_revision_id", "test_case_id", "test_case_revision_version"],
+            [
+                "test_case_revisions.id",
+                "test_case_revisions.test_case_id",
+                "test_case_revisions.version",
+            ],
+            ondelete="RESTRICT",
+            name="fk_suite_revision_items_test_case_revision_version",
+        ),
+        UniqueConstraint("suite_revision_id", "test_case_id", name="uq_suite_revision_items_case"),
+        Index("ix_suite_revision_items_revision_order", "suite_revision_id", "ordinal"),
+    )
+
+    suite_revision_id: Mapped[UUID] = mapped_column(primary_key=True)
+    ordinal: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID]
+    test_case_id: Mapped[UUID]
+    test_case_revision_id: Mapped[UUID]
+    test_case_revision_version: Mapped[int] = mapped_column(Integer)
 
 
 class ChangeEventRow(Base):

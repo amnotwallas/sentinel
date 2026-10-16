@@ -303,4 +303,66 @@ describe('catalog API client', () => {
       definition: { request: { method: 'GET', path: '/healthz' } },
     });
   });
+
+  it('creates an ordered suite with generated revision-pin types', async () => {
+    const projectId = '00000000-0000-4000-8000-000000000001';
+    const revisionIds = [
+      '00000000-0000-4000-8000-000000000031',
+      '00000000-0000-4000-8000-000000000032',
+    ];
+    const requests: Request[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return new Response(
+        JSON.stringify({
+          id: '00000000-0000-4000-8000-000000000010',
+          project_id: projectId,
+          name: 'Ordered suite',
+          active_revision_id: '00000000-0000-4000-8000-000000000011',
+          created_at: '2030-01-01T12:30:00.000000Z',
+          updated_at: '2030-01-01T12:30:00.000000Z',
+          active_revision: {
+            id: '00000000-0000-4000-8000-000000000011',
+            suite_id: '00000000-0000-4000-8000-000000000010',
+            version: 1,
+            schema_version: 1,
+            items: revisionIds.map((revisionId, ordinal) => ({
+              ordinal,
+              test_case_id: `00000000-0000-4000-8000-0000000000${21 + ordinal}`,
+              test_case_revision_id: revisionId,
+              test_case_revision_version: 1,
+            })),
+            created_at: '2030-01-01T12:30:00.000000Z',
+          },
+        }),
+        {
+          status: 201,
+          headers: {
+            'content-type': 'application/json',
+            etag: '"suite:00000000-0000-4000-8000-000000000010:1"',
+            location: '/api/v1/suites/00000000-0000-4000-8000-000000000010',
+          },
+        },
+      );
+    };
+    const client = createApiClient(fetcher);
+
+    const result = await client.POST('/api/v1/projects/{project_id}/suites', {
+      params: { path: { project_id: projectId } },
+      body: { name: 'Ordered suite', test_case_revision_ids: revisionIds },
+    });
+
+    expect(result.data?.active_revision.items[1]?.test_case_revision_id).toBe(
+      revisionIds[1],
+    );
+    expect(requests[0]?.method).toBe('POST');
+    expect(await requests[0]?.json()).toEqual({
+      name: 'Ordered suite',
+      test_case_revision_ids: revisionIds,
+    });
+    expect(result.response.headers.get('etag')).toBe(
+      '"suite:00000000-0000-4000-8000-000000000010:1"',
+    );
+  });
 });

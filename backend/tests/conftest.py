@@ -16,6 +16,9 @@ from sentinel.persistence.models import (
     ExecutionRow,
     JobRow,
     ProjectRow,
+    SuiteRevisionItemRow,
+    SuiteRevisionRow,
+    SuiteRow,
     TestCaseRevisionRow,
     TestCaseRow,
 )
@@ -58,6 +61,9 @@ def engine() -> Iterator[Engine]:
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))
         conn.execute(delete(ChangeEventRow))
+        conn.execute(delete(SuiteRevisionItemRow))
+        conn.execute(delete(SuiteRevisionRow))
+        conn.execute(delete(SuiteRow))
         conn.execute(delete(TestCaseRevisionRow))
         conn.execute(delete(TestCaseRow))
         conn.execute(delete(EnvironmentRevisionRow))

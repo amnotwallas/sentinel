@@ -1,0 +1,202 @@
+{
+  "SuiteDetail": {
+    "additionalProperties": false,
+    "properties": {
+      "active_revision": {
+        "$ref": "#/components/schemas/SuiteRevision"
+      },
+      "active_revision_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "project_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "updated_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      }
+    },
+    "required": [
+      "id",
+      "project_id",
+      "name",
+      "active_revision_id",
+      "created_at",
+      "updated_at",
+      "active_revision"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "pointer equals revision.id;revision owner equals identity.id"
+    ]
+  },
+  "SuitePage": {
+    "additionalProperties": false,
+    "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/components/schemas/SuiteSummary"
+        },
+        "maxItems": 100,
+        "minItems": 0,
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "items",
+      "next_cursor"
+    ],
+    "type": "object",
+    "x-max-encoded-utf8-bytes": 1048576
+  },
+  "SuiteRevision": {
+    "additionalProperties": false,
+    "properties": {
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "items": {
+        "items": {
+          "$ref": "#/components/schemas/SuiteRevisionItem"
+        },
+        "maxItems": 100,
+        "minItems": 1,
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "type": "integer"
+      },
+      "suite_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "version": {
+        "$ref": "#/components/schemas/Version"
+      }
+    },
+    "required": [
+      "id",
+      "suite_id",
+      "version",
+      "schema_version",
+      "items",
+      "created_at"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "contiguous ordinals0..n-1",
+      "unique case membership"
+    ]
+  },
+  "SuiteRevisionItem": {
+    "additionalProperties": false,
+    "properties": {
+      "ordinal": {
+        "maximum": 99,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "test_case_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "test_case_revision_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "test_case_revision_version": {
+        "$ref": "#/components/schemas/Version"
+      }
+    },
+    "required": [
+      "ordinal",
+      "test_case_id",
+      "test_case_revision_id",
+      "test_case_revision_version"
+    ],
+    "type": "object"
+  },
+  "SuiteSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "active_revision_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "active_revision_version": {
+        "$ref": "#/components/schemas/Version"
+      },
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "project_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "updated_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      }
+    },
+    "required": [
+      "id",
+      "project_id",
+      "name",
+      "active_revision_id",
+      "created_at",
+      "updated_at",
+      "active_revision_version"
+    ],
+    "type": "object"
+  },
+  "SuiteWrite": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "test_case_revision_ids": {
+        "items": {
+          "$ref": "#/components/schemas/UUID"
+        },
+        "maxItems": 100,
+        "minItems": 1,
+        "type": "array",
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "name",
+      "test_case_revision_ids"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "same project",
+      "one test-case membership even across different revisions",
+      "exact revision pins in input order"
+    ]
+  }
+}

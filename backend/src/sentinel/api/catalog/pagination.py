@@ -72,6 +72,14 @@ def decode_test_case_cursor(project_id: UUID, value: str) -> tuple[datetime, UUI
     return _decode_cursor(value, "test_cases", project_id)
 
 
+def encode_suite_cursor(project_id: UUID, after: tuple[datetime, UUID]) -> str:
+    return _encode_cursor("suites", project_id, after)
+
+
+def decode_suite_cursor(project_id: UUID, value: str) -> tuple[datetime, UUID]:
+    return _decode_cursor(value, "suites", project_id)
+
+
 def encode_test_case_revision_cursor(test_case_id: UUID, after: tuple[int, UUID]) -> str:
     return _encode_version_cursor("test_case_revisions", test_case_id, after)
 

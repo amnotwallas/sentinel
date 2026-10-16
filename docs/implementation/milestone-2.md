@@ -1,6 +1,19 @@
 # Milestone 2 wire contracts and integration packet
 
-Status: implementation-ready design baseline for the future task packets; no catalog business functionality is implemented. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual health-only API/probe persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This document is not authorization to begin feature implementation.
+Status: implementation-ready design baseline for the future task packets; M2-06 test-case catalog functionality is integrated and M2-07 suite implementation is in progress. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual catalog persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This document is not authorization to begin an unapproved feature.
+
+## Implementation ledger
+
+M2-06 immutable test cases are integrated on `main` as
+`3c50c2bb05f68a15c83df4312f7b1877797ce426`. The user confirmed GitHub Actions
+workflow #5 reported success for that SHA. Local verification recorded 160
+non-integration backend tests, 47 PostgreSQL integration tests, 8 frontend
+tests, migration upgrade/downgrade/drift checks, generated-contract checks, and
+Compose/worker/readiness smoke checks. The M2-06 acceptance review found and
+corrected seven defects covering ETag handling, ownership constraints, bounded
+history responses, sanitized secret/replay errors, version exhaustion, exact
+decimal persistence, and runtime/generated OpenAPI alignment. M2-07 is the next
+authorized slice; M2-08 acceptance and integration remain future work.
 
 ## 1. Scope and decision provenance
 
@@ -380,10 +393,11 @@ Readiness must compare the database revision against the running package's suppo
 
 Minimum named contract fixtures: project create/list/notfound; environment create/rename/full-definition change; valid strict test document containing synthetic reference; rejected credential literal/context; unrelated baggage allowed; canonical reordered-object/numeric vectors; explicit unsafe replay consent; stale/missing/malformed ETag; cross-scope/invalid cursor; suite exact revision order/duplicate case/missing membership; two concurrent writes one412; transaction rollback leaves no history; catalog reads invoke no DNS/dispatch/secret resolver; canaries absent from API/logs/spans/database; future queued/evaluated/ambiguous/expired-artifact/missing-Tempo result; inventory-only and needs-configuration OpenAPI previews with no external fetch.
 
-The current repository implements health, projects, and the versioned environment
-API candidate alongside probe execution/job rows. Later catalog definitions remain
-planned only. The planned schema stays broader than the active generated contract;
-each later slice must be implemented and verified before runtime regeneration.
+The current repository implements health, projects, the versioned environment API,
+and immutable test-case revisions alongside probe execution/job rows. Ordered
+suites remain the active M2-07 implementation slice. The planned schema stays
+broader than the active generated contract; each slice must be implemented and
+verified before runtime regeneration.
 
 ## 12. Machine-readable handoff and implementation start
 

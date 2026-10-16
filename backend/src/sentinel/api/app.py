@@ -16,11 +16,14 @@ from starlette.responses import Response
 from sentinel.api.body_limit import BodyLimitMiddleware
 from sentinel.api.catalog.environments import environment_router
 from sentinel.api.catalog.projects import project_router
+from sentinel.api.catalog.suite_openapi import suite_schemas
+from sentinel.api.catalog.suites import suite_router
 from sentinel.api.catalog.test_case_openapi import test_case_schemas
 from sentinel.api.catalog.test_cases import test_case_router
 from sentinel.api.problems import problem, validation_problem
 from sentinel.catalog.environments import EnvironmentService
 from sentinel.catalog.projects import ProjectService
+from sentinel.catalog.suites import SuiteService
 from sentinel.catalog.test_cases import TestCaseService
 from sentinel.config import Settings
 from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
@@ -39,6 +42,7 @@ class SentinelAPI(FastAPI):
     def openapi(self) -> dict[str, Any]:
         schema = super().openapi()
         schema.setdefault("components", {}).setdefault("schemas", {}).update(test_case_schemas())
+        schema["components"]["schemas"].update(suite_schemas())
         # FastAPI always adds its default JSON media type for a documented model.
         # Sentinel problem responses use RFC 9457's dedicated media type instead.
         for path in schema.get("paths", {}).values():
@@ -52,6 +56,7 @@ class SentinelAPI(FastAPI):
         for path, method in (
             ("/api/v1/environments/{environment_id}", "patch"),
             ("/api/v1/test-cases/{test_case_id}", "put"),
+            ("/api/v1/suites/{suite_id}", "put"),
         ):
             update = schema.get("paths", {}).get(path, {}).get(method)
             if update is not None:
@@ -80,6 +85,7 @@ def create_app(
     project_service: ProjectService | None = None,
     environment_service: EnvironmentService | None = None,
     test_case_service: TestCaseService | None = None,
+    suite_service: SuiteService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url.get_secret_value())
@@ -113,6 +119,12 @@ def create_app(
         validate_document=validate_test_definition,
     )
     app.include_router(test_case_router(test_cases))
+    suites = suite_service or SuiteService(
+        lambda: PostgresCatalogUnitOfWork(sessions),
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+    )
+    app.include_router(suite_router(suites))
 
     async def tempo_ready() -> bool:
         try:
