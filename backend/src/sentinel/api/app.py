@@ -16,14 +16,20 @@ from starlette.responses import Response
 from sentinel.api.body_limit import BodyLimitMiddleware
 from sentinel.api.catalog.environments import environment_router
 from sentinel.api.catalog.projects import project_router
+from sentinel.api.catalog.test_case_openapi import test_case_schemas
+from sentinel.api.catalog.test_cases import test_case_router
 from sentinel.api.problems import problem, validation_problem
 from sentinel.catalog.environments import EnvironmentService
 from sentinel.catalog.projects import ProjectService
+from sentinel.catalog.test_cases import TestCaseService
 from sentinel.config import Settings
 from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
 from sentinel.persistence.database import create_database
 from sentinel.persistence.readiness import database_is_current
-from sentinel.security.definition_policy import validate_environment_document
+from sentinel.security.definition_policy import (
+    validate_environment_document,
+    validate_test_definition,
+)
 from sentinel.telemetry.runtime import provider
 
 Probe = Callable[[], Awaitable[bool]]
@@ -32,6 +38,7 @@ Probe = Callable[[], Awaitable[bool]]
 class SentinelAPI(FastAPI):
     def openapi(self) -> dict[str, Any]:
         schema = super().openapi()
+        schema.setdefault("components", {}).setdefault("schemas", {}).update(test_case_schemas())
         # FastAPI always adds its default JSON media type for a documented model.
         # Sentinel problem responses use RFC 9457's dedicated media type instead.
         for path in schema.get("paths", {}).values():
@@ -42,14 +49,16 @@ class SentinelAPI(FastAPI):
                         json_content = content.pop("application/json", None)
                         if json_content and not content["application/problem+json"]:
                             content["application/problem+json"] = json_content
-        update = (
-            schema.get("paths", {}).get("/api/v1/environments/{environment_id}", {}).get("patch")
-        )
-        if update is not None:
-            for parameter in update.get("parameters", []):
-                if parameter.get("in") == "header" and parameter.get("name") == "if-match":
-                    # Runtime handles absence itself to return the contractual 428.
-                    parameter["required"] = True
+        for path, method in (
+            ("/api/v1/environments/{environment_id}", "patch"),
+            ("/api/v1/test-cases/{test_case_id}", "put"),
+        ):
+            update = schema.get("paths", {}).get(path, {}).get(method)
+            if update is not None:
+                for parameter in update.get("parameters", []):
+                    if parameter.get("in") == "header" and parameter.get("name") == "if-match":
+                        # Runtime handles absence itself to return the contractual 428.
+                        parameter["required"] = True
         return schema
 
 
@@ -70,6 +79,7 @@ def create_app(
     tempo_probe: Probe | None = None,
     project_service: ProjectService | None = None,
     environment_service: EnvironmentService | None = None,
+    test_case_service: TestCaseService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url.get_secret_value())
@@ -96,6 +106,13 @@ def create_app(
         validate_document=validate_environment_document,
     )
     app.include_router(environment_router(environments))
+    test_cases = test_case_service or TestCaseService(
+        lambda: PostgresCatalogUnitOfWork(sessions),
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+        validate_document=validate_test_definition,
+    )
+    app.include_router(test_case_router(test_cases))
 
     async def tempo_ready() -> bool:
         try:

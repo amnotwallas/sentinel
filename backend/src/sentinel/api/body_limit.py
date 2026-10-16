@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import cast
 
 from starlette.datastructures import Headers
@@ -10,6 +11,9 @@ from sentinel.api.problems import field_problem, problem
 
 class InvalidJSON(ValueError):
     pass
+
+
+PARSED_JSON_SCOPE_KEY = "sentinel.parsed_json"
 
 
 def _closed_object(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
@@ -86,6 +90,7 @@ class BodyLimitMiddleware:
                     body.decode("utf-8"),
                     object_pairs_hook=_closed_object,
                     parse_constant=_reject_constant,
+                    parse_float=Decimal,
                 ),
             )
             if _contains_surrogate(parsed):
@@ -106,6 +111,8 @@ class BodyLimitMiddleware:
                 field_code="value_invalid",
             )(scope, receive, send)
             return
+
+        scope.setdefault("state", {})[PARSED_JSON_SCOPE_KEY] = parsed
 
         sent = False
 

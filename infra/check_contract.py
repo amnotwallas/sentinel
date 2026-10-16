@@ -23,9 +23,6 @@ def main() -> int:
         output = Path(directory)
         spec = output / "openapi.json"
         schema = output / "schema.ts"
-        # Multi-API Redocly configs override CLI output paths. Use an isolated config.
-        redocly = output / "redocly.yaml"
-        redocly.write_text("{}\n")
         subprocess.run(
             [sys.executable, "-m", "sentinel.api.export", str(spec)],
             cwd=root,
@@ -49,14 +46,9 @@ def main() -> int:
         subprocess.run(
             [
                 "node",
-                str(tools / "openapi-typescript"),
+                str(frontend / "scripts" / "generate-api.mjs"),
                 str(spec),
-                "--default-non-nullable",
-                "false",
-                "-o",
                 str(schema),
-                "--redocly",
-                str(redocly),
             ],
             cwd=output,
             env=environment,

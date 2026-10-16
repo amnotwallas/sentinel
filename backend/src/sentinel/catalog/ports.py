@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from sentinel.catalog.changes import ChangeEvent
     from sentinel.catalog.environments import Environment
     from sentinel.catalog.projects import Project
+    from sentinel.catalog.test_cases import TestCase, TestCaseRevision
 
 
 class ProjectRepository(Protocol):
@@ -43,6 +44,30 @@ class EnvironmentRepository(Protocol):
     ) -> list["Environment"]: ...
 
 
+class TestCaseRepository(Protocol):
+    def add(self, test_case: "TestCase") -> None: ...
+
+    def get(self, test_case_id: UUID, *, for_update: bool = False) -> "TestCase | None": ...
+
+    def replace(self, test_case: "TestCase") -> None: ...
+
+    def list_after(
+        self,
+        *,
+        project_id: UUID,
+        after: tuple[datetime, UUID] | None,
+        limit: int,
+    ) -> list["TestCase"]: ...
+
+    def list_revisions_after(
+        self,
+        *,
+        test_case_id: UUID,
+        after: tuple[int, UUID] | None,
+        limit: int,
+    ) -> list["TestCaseRevision"]: ...
+
+
 class ProjectUnitOfWork(Protocol):
     @property
     def projects(self) -> ProjectRepository: ...
@@ -65,6 +90,17 @@ class CatalogUnitOfWork(ProjectUnitOfWork, Protocol):
 
     @property
     def environments(self) -> EnvironmentRepository: ...
+
+
+class TestCaseUnitOfWork(ProjectUnitOfWork, Protocol):
+    @property
+    def changes(self) -> ChangeRepository: ...
+
+    @property
+    def test_cases(self) -> TestCaseRepository: ...
+
+
+TestCaseUnitOfWorkFactory = Callable[[], TestCaseUnitOfWork]
 
 
 UnitOfWorkFactory = Callable[[], ProjectUnitOfWork]

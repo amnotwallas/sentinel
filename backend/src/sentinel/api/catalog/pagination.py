@@ -64,6 +64,22 @@ def decode_environment_cursor(project_id: UUID, value: str) -> tuple[datetime, U
     return _decode_cursor(value, "environments", project_id)
 
 
+def encode_test_case_cursor(project_id: UUID, after: tuple[datetime, UUID]) -> str:
+    return _encode_cursor("test_cases", project_id, after)
+
+
+def decode_test_case_cursor(project_id: UUID, value: str) -> tuple[datetime, UUID]:
+    return _decode_cursor(value, "test_cases", project_id)
+
+
+def encode_test_case_revision_cursor(test_case_id: UUID, after: tuple[int, UUID]) -> str:
+    return _encode_version_cursor("test_case_revisions", test_case_id, after)
+
+
+def decode_test_case_revision_cursor(test_case_id: UUID, value: str) -> tuple[int, UUID]:
+    return _decode_version_cursor(value, "test_case_revisions", test_case_id)
+
+
 def _decode_cursor(value: str, resource_kind: str, scope_id: UUID | None) -> tuple[datetime, UUID]:
     try:
         if not _CURSOR_PATTERN.fullmatch(value):
@@ -106,5 +122,61 @@ def _decode_cursor(value: str, resource_kind: str, scope_id: UUID | None) -> tup
         if str(project_id) != id_text or project_id.int == 0:
             raise CursorInvalid
         return created_at, project_id
+    except (UnicodeDecodeError, binascii.Error, json.JSONDecodeError, ValueError, TypeError):
+        raise CursorInvalid from None
+
+
+def _encode_version_cursor(resource_kind: str, scope_id: UUID, after: tuple[int, UUID]) -> str:
+    version, revision_id = after
+    payload = {
+        "after": {"version": version, "id": str(revision_id)},
+        "cursor_version": 1,
+        "filter_fingerprint": _EMPTY_FILTER_FINGERPRINT,
+        "resource_kind": resource_kind,
+        "scope_id": str(scope_id),
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return base64.urlsafe_b64encode(canonical.encode("utf-8")).rstrip(b"=").decode("ascii")
+
+
+def _decode_version_cursor(value: str, resource_kind: str, scope_id: UUID) -> tuple[int, UUID]:
+    try:
+        if not _CURSOR_PATTERN.fullmatch(value):
+            raise CursorInvalid
+        padding = "=" * (-len(value) % 4)
+        decoded = base64.b64decode(value + padding, altchars=b"-_", validate=True)
+        if len(decoded) > 1536:
+            raise CursorInvalid
+        payload = json.loads(
+            decoded.decode("utf-8"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_constant,
+        )
+        if not isinstance(payload, dict) or set(payload) != {
+            "after",
+            "cursor_version",
+            "filter_fingerprint",
+            "resource_kind",
+            "scope_id",
+        }:
+            raise CursorInvalid
+        if (
+            payload["cursor_version"] != 1
+            or payload["resource_kind"] != resource_kind
+            or payload["scope_id"] != str(scope_id)
+            or payload["filter_fingerprint"] != _EMPTY_FILTER_FINGERPRINT
+        ):
+            raise CursorInvalid
+        after = payload["after"]
+        if not isinstance(after, dict) or set(after) != {"version", "id"}:
+            raise CursorInvalid
+        version = after["version"]
+        id_text = after["id"]
+        if type(version) is not int or version < 1 or not isinstance(id_text, str):
+            raise CursorInvalid
+        revision_id = UUID(id_text)
+        if str(revision_id) != id_text or revision_id.int == 0:
+            raise CursorInvalid
+        return version, revision_id
     except (UnicodeDecodeError, binascii.Error, json.JSONDecodeError, ValueError, TypeError):
         raise CursorInvalid from None

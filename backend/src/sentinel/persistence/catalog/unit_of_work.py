@@ -7,6 +7,7 @@ from sentinel.catalog.projects import ProjectNameConflict
 from sentinel.persistence.catalog.changes import SqlAlchemyChangeRepository
 from sentinel.persistence.catalog.environments import SqlAlchemyEnvironmentRepository
 from sentinel.persistence.catalog.projects import SqlAlchemyProjectRepository
+from sentinel.persistence.catalog.test_cases import SqlAlchemyTestCaseRepository
 
 
 class PostgresCatalogUnitOfWork:
@@ -18,6 +19,7 @@ class PostgresCatalogUnitOfWork:
         self._session = self._sessions()
         self.projects = SqlAlchemyProjectRepository(self._session)
         self.environments = SqlAlchemyEnvironmentRepository(self._session)
+        self.test_cases = SqlAlchemyTestCaseRepository(self._session)
         self.changes = SqlAlchemyChangeRepository(self._session)
         return self
 

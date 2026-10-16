@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, delete, make_url, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from sentinel.persistence.database import deserialize_json, serialize_json
 from sentinel.persistence.models import (
     ChangeEventRow,
     EnvironmentRevisionRow,
@@ -15,6 +16,8 @@ from sentinel.persistence.models import (
     ExecutionRow,
     JobRow,
     ProjectRow,
+    TestCaseRevisionRow,
+    TestCaseRow,
 )
 from sentinel.persistence.queue import PostgresJobStore
 
@@ -43,12 +46,20 @@ def engine() -> Iterator[Engine]:
     parsed = make_url(url)
     if parsed.drivername != "postgresql+psycopg" or not (parsed.database or "").endswith("_test"):
         pytest.fail("Integration tests require a dedicated postgresql+psycopg *_test database")
-    engine = create_engine(url, pool_pre_ping=True, hide_parameters=True)
+    engine = create_engine(
+        url,
+        pool_pre_ping=True,
+        hide_parameters=True,
+        json_serializer=serialize_json,
+        json_deserializer=deserialize_json,
+    )
     with engine.begin() as conn:
         conn.execute(text("SET CONSTRAINTS fk_environments_active_revision DEFERRED"))
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))
         conn.execute(delete(ChangeEventRow))
+        conn.execute(delete(TestCaseRevisionRow))
+        conn.execute(delete(TestCaseRow))
         conn.execute(delete(EnvironmentRevisionRow))
         conn.execute(delete(EnvironmentRow))
         conn.execute(delete(ProjectRow))

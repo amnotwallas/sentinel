@@ -1,7 +1,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -65,6 +75,57 @@ class EnvironmentRevisionRow(Base):
     environment_id: Mapped[UUID] = mapped_column(ForeignKey("environments.id", ondelete="RESTRICT"))
     version: Mapped[int] = mapped_column(Integer)
     definition: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TestCaseRow(Base):
+    __test__ = False
+    __tablename__ = "test_cases"
+    __table_args__ = (
+        CheckConstraint("state_version BETWEEN 1 AND 2147483647", name="test_case_state_version"),
+        ForeignKeyConstraint(
+            ["active_revision_id", "id"],
+            ["test_case_revisions.id", "test_case_revisions.test_case_id"],
+            deferrable=True,
+            initially="DEFERRED",
+            use_alter=True,
+            name="fk_test_cases_active_revision",
+        ),
+        Index("ix_test_cases_project_list", "project_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(String(120))
+    active_revision_id: Mapped[UUID]
+    state_version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TestCaseRevisionRow(Base):
+    __test__ = False
+    __tablename__ = "test_case_revisions"
+    __table_args__ = (
+        CheckConstraint("version BETWEEN 1 AND 2147483647", name="test_case_revision_version"),
+        CheckConstraint(
+            "(unsafe_replay_acknowledgement IS NULL AND unsafe_replay_acknowledged_at IS NULL) "
+            "OR (unsafe_replay_acknowledgement = 'duplicate_effects_possible' "
+            "AND unsafe_replay_acknowledged_at IS NOT NULL)",
+            name="test_case_replay_ack_shape",
+        ),
+        UniqueConstraint("id", "test_case_id", name="uq_test_case_revisions_identity_owner"),
+        Index("uq_test_case_revisions_version", "test_case_id", "version", unique=True),
+        Index("ix_test_case_revisions_history", "test_case_id", "version", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    test_case_id: Mapped[UUID] = mapped_column(ForeignKey("test_cases.id", ondelete="RESTRICT"))
+    version: Mapped[int] = mapped_column(Integer)
+    definition: Mapped[dict[str, object]] = mapped_column(JSONB)
+    policy_fingerprint: Mapped[str] = mapped_column(String(64))
+    unsafe_replay_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unsafe_replay_acknowledgement: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

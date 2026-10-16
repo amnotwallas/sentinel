@@ -1,0 +1,1805 @@
+{
+  "Assertion": {
+    "discriminator": {
+      "propertyName": "kind",
+      "mapping": {
+        "status_code": "#/components/schemas/StatusCodeAssertion",
+        "header_present": "#/components/schemas/HeaderPresentAssertion",
+        "header_equals": "#/components/schemas/HeaderEqualsAssertion",
+        "json_present": "#/components/schemas/JSONPresentAssertion",
+        "json_absent": "#/components/schemas/JSONAbsentAssertion",
+        "json_type": "#/components/schemas/JSONTypeAssertion",
+        "json_equals": "#/components/schemas/JSONEqualsAssertion",
+        "text_equals": "#/components/schemas/TextEqualsAssertion"
+      }
+    },
+    "oneOf": [
+      {
+        "$ref": "#/components/schemas/StatusCodeAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/HeaderPresentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/HeaderEqualsAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONPresentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONAbsentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONTypeAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONEqualsAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/TextEqualsAssertion"
+      }
+    ]
+  },
+  "CanonicalAssertion": {
+    "discriminator": {
+      "propertyName": "kind",
+      "mapping": {
+        "status_code": "#/components/schemas/StatusCodeAssertion",
+        "header_present": "#/components/schemas/CanonicalHeaderPresentAssertion",
+        "header_equals": "#/components/schemas/CanonicalHeaderEqualsAssertion",
+        "json_present": "#/components/schemas/JSONPresentAssertion",
+        "json_absent": "#/components/schemas/JSONAbsentAssertion",
+        "json_type": "#/components/schemas/JSONTypeAssertion",
+        "json_equals": "#/components/schemas/JSONEqualsAssertion",
+        "text_equals": "#/components/schemas/TextEqualsAssertion"
+      }
+    },
+    "oneOf": [
+      {
+        "$ref": "#/components/schemas/StatusCodeAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/CanonicalHeaderPresentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/CanonicalHeaderEqualsAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONPresentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONAbsentAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONTypeAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/JSONEqualsAssertion"
+      },
+      {
+        "$ref": "#/components/schemas/TextEqualsAssertion"
+      }
+    ]
+  },
+  "CanonicalComparisonPolicy": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "else": {
+          "properties": {
+            "text_body_selector": {
+              "type": "null"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "exact_text_body": {
+              "const": true
+            }
+          },
+          "required": [
+            "exact_text_body"
+          ]
+        },
+        "then": {
+          "properties": {
+            "selectors": {
+              "maxItems": 0
+            },
+            "text_body_selector": {
+              "$ref": "#/components/schemas/TextSelector"
+            }
+          },
+          "required": [
+            "text_body_selector"
+          ]
+        }
+      }
+    ],
+    "properties": {
+      "exact_text_body": {
+        "default": false,
+        "type": "boolean"
+      },
+      "performance_threshold_ms": {
+        "anyOf": [
+          {
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      },
+      "selectors": {
+        "items": {
+          "$ref": "#/components/schemas/CanonicalJSONSelector"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "text_body_selector": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TextSelector"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      }
+    },
+    "required": [
+      "schema_version",
+      "selectors",
+      "exact_text_body",
+      "text_body_selector",
+      "performance_threshold_ms"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "unique selector pointers and revision rule UUIDs",
+      "SHA256 over complete default-materialized canonical policy",
+      "object keys sorted;array order preserved;no float intermediate"
+    ]
+  },
+  "CanonicalHeaderEqualsAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected": {
+        "maxLength": 8192,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 8192
+      },
+      "header_name": {
+        "$ref": "#/components/schemas/CanonicalHeaderName",
+        "not": {
+          "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+        }
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "header_equals",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "header_name",
+      "expected"
+    ],
+    "type": "object"
+  },
+  "CanonicalHeaderName": {
+    "maxLength": 128,
+    "minLength": 1,
+    "pattern": "^[!#$%&'*+.^_\\x60|~0-9a-z-]+$",
+    "type": "string",
+    "x-max-utf8-bytes": 128
+  },
+  "CanonicalHeaderPresentAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "header_name": {
+        "$ref": "#/components/schemas/CanonicalHeaderName"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "header_present",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "header_name"
+    ],
+    "type": "object"
+  },
+  "CanonicalJSONSelector": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "normalizer": {
+        "$ref": "#/components/schemas/Normalizer",
+        "default": {
+          "name": "none",
+          "version": 1
+        }
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "pointer",
+      "normalizer"
+    ],
+    "type": "object"
+  },
+  "CanonicalRedaction": {
+    "additionalProperties": false,
+    "properties": {
+      "header_names": {
+        "items": {
+          "$ref": "#/components/schemas/CanonicalHeaderName"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array",
+        "uniqueItems": true
+      },
+      "json_pointers": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/JSONPointer"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array",
+        "uniqueItems": true
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "json_pointers",
+      "header_names"
+    ],
+    "type": "object"
+  },
+  "CanonicalRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RequestBody"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "connect_timeout_ms": {
+        "default": 5000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "follow_redirects": {
+        "default": false,
+        "type": "boolean"
+      },
+      "headers": {
+        "items": {
+          "$ref": "#/components/schemas/CanonicalRequestHeader"
+        },
+        "maxItems": 64,
+        "minItems": 0,
+        "type": "array"
+      },
+      "max_redirects": {
+        "default": 3,
+        "maximum": 3,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "max_response_bytes": {
+        "default": 262144,
+        "maximum": 1048576,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "method": {
+        "$ref": "#/components/schemas/Method"
+      },
+      "path": {
+        "maxLength": 2048,
+        "minLength": 1,
+        "pattern": "^/(?!/)[^?#\\\\\\u0000\\r\\n]*$",
+        "type": "string",
+        "x-max-utf8-bytes": 2048
+      },
+      "query": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/QueryParameter"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "read_timeout_ms": {
+        "default": 10000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "timeout_ms": {
+        "default": 30000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "verify_tls": {
+        "default": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "method",
+      "path",
+      "query",
+      "headers",
+      "body",
+      "timeout_ms",
+      "connect_timeout_ms",
+      "read_timeout_ms",
+      "follow_redirects",
+      "max_redirects",
+      "verify_tls",
+      "max_response_bytes"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "connect/read<=total",
+      "headers aggregate<=32768 bytes;unique normalized name",
+      "exact variable template grammar only",
+      "path no authority/dot segment;append below base prefix",
+      "limits may be lowered by deployment",
+      "TLS opt-out runtime policy needs M3 review"
+    ]
+  },
+  "CanonicalRequestHeader": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "not": {
+          "properties": {
+            "name": {
+              "pattern": "^(?:[tT][rR][aA][cC][eE][pP][aA][rR][eE][nN][tT]|[tT][rR][aA][cC][eE][sS][tT][aA][tT][eE]|[hH][oO][sS][tT]|[cC][oO][nN][tT][eE][nN][tT]-[lL][eE][nN][gG][tT][hH]|[tT][rR][aA][nN][sS][fF][eE][rR]-[eE][nN][cC][oO][dD][iI][nN][gG]|[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[uU][pP][gG][rR][aA][dD][eE]|[pP][rR][oO][xX][yY]-[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[tT][rR][aA][iI][lL][eE][rR]|[tT][eE]|[eE][xX][pP][eE][cC][tT])$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "name": {
+              "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "$ref": "#/components/schemas/SecretReference"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "name": {
+              "pattern": "^[bB][aA][gG][gG][aA][gG][eE]$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "allOf": [
+                {
+                  "not": {
+                    "pattern": "(^|,)\\s*(?:[sS][eE][nN][tT][iI][nN][eE][lL]\\.[eE][xX][eE][cC][uU][tT][iI][oO][nN]\\.[iI][dD]|[sS][eE][nN][tT][iI][nN][eE][lL]\\.[aA][tT][tT][eE][mM][pP][tT]\\.[iI][dD])\\s*="
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "\\{\\{|\\}\\}"
+                  }
+                }
+              ],
+              "maxLength": 4096,
+              "minLength": 0,
+              "pattern": "^[\\x20-\\x7e]*$",
+              "type": "string",
+              "x-max-utf8-bytes": 4096
+            }
+          }
+        }
+      }
+    ],
+    "properties": {
+      "name": {
+        "$ref": "#/components/schemas/CanonicalHeaderName"
+      },
+      "value": {
+        "oneOf": [
+          {
+            "maxLength": 8192,
+            "minLength": 0,
+            "pattern": "^[^\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 8192
+          },
+          {
+            "$ref": "#/components/schemas/SecretReference"
+          }
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "value"
+    ],
+    "type": "object"
+  },
+  "CanonicalTestDefinition": {
+    "additionalProperties": false,
+    "properties": {
+      "allow_unsafe_replay": {
+        "default": false,
+        "type": "boolean"
+      },
+      "assertions": {
+        "items": {
+          "$ref": "#/components/schemas/CanonicalAssertion"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "comparison_policy": {
+        "$ref": "#/components/schemas/CanonicalComparisonPolicy"
+      },
+      "redaction": {
+        "$ref": "#/components/schemas/CanonicalRedaction"
+      },
+      "request": {
+        "$ref": "#/components/schemas/CanonicalRequest"
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "request",
+      "assertions",
+      "comparison_policy",
+      "redaction",
+      "allow_unsafe_replay"
+    ],
+    "type": "object",
+    "x-max-canonical-utf8-bytes": 262144,
+    "x-max-depth": 32
+  },
+  "ComparisonPolicy": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "else": {
+          "properties": {
+            "text_body_selector": {
+              "type": "null"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "exact_text_body": {
+              "const": true
+            }
+          },
+          "required": [
+            "exact_text_body"
+          ]
+        },
+        "then": {
+          "properties": {
+            "selectors": {
+              "maxItems": 0
+            },
+            "text_body_selector": {
+              "$ref": "#/components/schemas/TextSelector"
+            }
+          },
+          "required": [
+            "text_body_selector"
+          ]
+        }
+      }
+    ],
+    "properties": {
+      "exact_text_body": {
+        "default": false,
+        "type": "boolean"
+      },
+      "performance_threshold_ms": {
+        "anyOf": [
+          {
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      },
+      "selectors": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/JSONSelector"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "text_body_selector": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TextSelector"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      }
+    },
+    "required": [],
+    "type": "object",
+    "x-semantic-validation": [
+      "unique selector pointers and revision rule UUIDs",
+      "SHA256 over complete default-materialized canonical policy",
+      "object keys sorted;array order preserved;no float intermediate"
+    ]
+  },
+  "Cursor": {
+    "description": "Opaque unpadded base64url of DecodedCursor. Decode<=1536 bytes; scope/filter validation remains application behavior.",
+    "maxLength": 2048,
+    "minLength": 1,
+    "pattern": "^[A-Za-z0-9_-]+$",
+    "type": "string",
+    "x-semantic-validation": [
+      "decoded shape/size",
+      "route/scope/filter match",
+      "matching sort key"
+    ]
+  },
+  "DecimalNumber": {
+    "description": "Finite original decimal token <=38 significant digits, adjusted exponent -128..128; canonical plain decimal/negative zero0; no binary float decision.",
+    "type": "number",
+    "x-adjusted-exponent-max": 128,
+    "x-adjusted-exponent-min": -128,
+    "x-max-significant-digits": 38
+  },
+  "HeaderEqualsAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected": {
+        "maxLength": 8192,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 8192
+      },
+      "header_name": {
+        "$ref": "#/components/schemas/HeaderName",
+        "not": {
+          "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+        }
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "header_equals",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "header_name",
+      "expected"
+    ],
+    "type": "object"
+  },
+  "HeaderName": {
+    "maxLength": 128,
+    "minLength": 1,
+    "pattern": "^[!#$%&'*+.^_\\x60|~0-9A-Za-z-]+$",
+    "type": "string",
+    "x-max-utf8-bytes": 128
+  },
+  "HeaderPresentAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "header_name": {
+        "$ref": "#/components/schemas/HeaderName"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "header_present",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "header_name"
+    ],
+    "type": "object"
+  },
+  "JSONAbsentAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "json_absent",
+        "type": "string"
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "pointer"
+    ],
+    "type": "object"
+  },
+  "JSONBody": {
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "const": "json",
+        "type": "string"
+      },
+      "value": {
+        "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+      }
+    },
+    "required": [
+      "kind",
+      "value"
+    ],
+    "type": "object"
+  },
+  "JSONEqualsAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected": {
+        "$ref": "#/components/schemas/JSONValue"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "json_equals",
+        "type": "string"
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "pointer",
+      "expected"
+    ],
+    "type": "object"
+  },
+  "JSONPointer": {
+    "maxLength": 1024,
+    "minLength": 0,
+    "pattern": "^(?:/(?:[^~]|~[01])*)*$",
+    "type": "string",
+    "x-max-utf8-bytes": 1024
+  },
+  "JSONPresentAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "json_present",
+        "type": "string"
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "pointer"
+    ],
+    "type": "object"
+  },
+  "JSONSelector": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "normalizer": {
+        "$ref": "#/components/schemas/Normalizer",
+        "default": {
+          "name": "none",
+          "version": 1
+        }
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "pointer"
+    ],
+    "type": "object"
+  },
+  "JSONTypeAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_type": {
+        "enum": [
+          "null",
+          "boolean",
+          "number",
+          "string",
+          "array",
+          "object"
+        ],
+        "type": "string"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "json_type",
+        "type": "string"
+      },
+      "pointer": {
+        "$ref": "#/components/schemas/JSONPointer"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "pointer",
+      "expected_type"
+    ],
+    "type": "object"
+  },
+  "JSONValue": {
+    "oneOf": [
+      {
+        "type": "null"
+      },
+      {
+        "type": "boolean"
+      },
+      {
+        "$ref": "#/components/schemas/DecimalNumber"
+      },
+      {
+        "maxLength": 65536,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 65536
+      },
+      {
+        "items": {
+          "$ref": "#/components/schemas/JSONValue"
+        },
+        "maxItems": 1000,
+        "minItems": 0,
+        "type": "array"
+      },
+      {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JSONValue"
+        },
+        "maxProperties": 256,
+        "propertyNames": {
+          "not": {
+            "const": "$secret"
+          }
+        },
+        "type": "object"
+      }
+    ],
+    "x-max-depth": 32
+  },
+  "JSONValueWithSecretLeaves": {
+    "oneOf": [
+      {
+        "type": "null"
+      },
+      {
+        "type": "boolean"
+      },
+      {
+        "$ref": "#/components/schemas/DecimalNumber"
+      },
+      {
+        "maxLength": 65536,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 65536
+      },
+      {
+        "items": {
+          "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+        },
+        "maxItems": 1000,
+        "minItems": 0,
+        "type": "array"
+      },
+      {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JSONValueWithSecretLeaves"
+        },
+        "maxProperties": 256,
+        "propertyNames": {
+          "not": {
+            "const": "$secret"
+          }
+        },
+        "type": "object"
+      },
+      {
+        "$ref": "#/components/schemas/SecretReference"
+      }
+    ],
+    "x-max-depth": 32
+  },
+  "Method": {
+    "enum": [
+      "GET",
+      "HEAD",
+      "OPTIONS",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ],
+    "type": "string"
+  },
+  "Name": {
+    "description": "Normalize before 1..120 code-point bounds; case-sensitive equality.",
+    "maxLength": 120,
+    "minLength": 1,
+    "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+    "type": "string",
+    "x-normalization": [
+      "NFC",
+      "trim_outer_spaces"
+    ]
+  },
+  "NoneNormalizer": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "const": "none",
+        "type": "string"
+      },
+      "version": {
+        "const": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "version"
+    ],
+    "type": "object"
+  },
+  "Normalizer": {
+    "description": "Validate named versioned policy in M2 only. Invalid runtime input yields explicit error;M4 verdict mapping unresolved.",
+    "discriminator": {
+      "propertyName": "name",
+      "mapping": {
+        "none": "#/components/schemas/NoneNormalizer",
+        "sort_scalar_array": "#/components/schemas/SortScalarArrayNormalizer",
+        "round_decimal": "#/components/schemas/RoundDecimalNormalizer"
+      }
+    },
+    "oneOf": [
+      {
+        "$ref": "#/components/schemas/NoneNormalizer"
+      },
+      {
+        "$ref": "#/components/schemas/SortScalarArrayNormalizer"
+      },
+      {
+        "$ref": "#/components/schemas/RoundDecimalNormalizer"
+      }
+    ]
+  },
+  "QueryParameter": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[^\\u0000\\r\\n]*$",
+        "type": "string",
+        "x-max-utf8-bytes": 128
+      },
+      "value": {
+        "maxLength": 4096,
+        "minLength": 0,
+        "pattern": "^[^\\u0000\\r\\n]*$",
+        "type": "string",
+        "x-max-utf8-bytes": 4096
+      }
+    },
+    "required": [
+      "name",
+      "value"
+    ],
+    "type": "object"
+  },
+  "Redaction": {
+    "additionalProperties": false,
+    "description": "Additional response protections;cannot disable fixed credential redaction.",
+    "properties": {
+      "header_names": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/HeaderName"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array",
+        "uniqueItems": true
+      },
+      "json_pointers": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/JSONPointer"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array",
+        "uniqueItems": true
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object",
+    "x-semantic-validation": [
+      "normalized header uniqueness",
+      "canonical set sorting"
+    ]
+  },
+  "Request": {
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RequestBody"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "connect_timeout_ms": {
+        "default": 5000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "follow_redirects": {
+        "default": false,
+        "type": "boolean"
+      },
+      "headers": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/RequestHeader"
+        },
+        "maxItems": 64,
+        "minItems": 0,
+        "type": "array"
+      },
+      "max_redirects": {
+        "default": 3,
+        "maximum": 3,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "max_response_bytes": {
+        "default": 262144,
+        "maximum": 1048576,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "method": {
+        "$ref": "#/components/schemas/Method"
+      },
+      "path": {
+        "maxLength": 2048,
+        "minLength": 1,
+        "pattern": "^/(?!/)[^?#\\\\\\u0000\\r\\n]*$",
+        "type": "string",
+        "x-max-utf8-bytes": 2048
+      },
+      "query": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/QueryParameter"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "read_timeout_ms": {
+        "default": 10000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "timeout_ms": {
+        "default": 30000,
+        "maximum": 120000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "verify_tls": {
+        "default": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "method",
+      "path"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "connect/read<=total",
+      "headers aggregate<=32768 bytes;unique normalized name",
+      "exact variable template grammar only",
+      "path no authority/dot segment;append below base prefix",
+      "limits may be lowered by deployment",
+      "TLS opt-out runtime policy needs M3 review"
+    ]
+  },
+  "RequestBody": {
+    "discriminator": {
+      "propertyName": "kind",
+      "mapping": {
+        "json": "#/components/schemas/JSONBody",
+        "text": "#/components/schemas/TextBody"
+      }
+    },
+    "oneOf": [
+      {
+        "$ref": "#/components/schemas/JSONBody"
+      },
+      {
+        "$ref": "#/components/schemas/TextBody"
+      }
+    ]
+  },
+  "RequestHeader": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "not": {
+          "properties": {
+            "name": {
+              "pattern": "^(?:[tT][rR][aA][cC][eE][pP][aA][rR][eE][nN][tT]|[tT][rR][aA][cC][eE][sS][tT][aA][tT][eE]|[hH][oO][sS][tT]|[cC][oO][nN][tT][eE][nN][tT]-[lL][eE][nN][gG][tT][hH]|[tT][rR][aA][nN][sS][fF][eE][rR]-[eE][nN][cC][oO][dD][iI][nN][gG]|[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[uU][pP][gG][rR][aA][dD][eE]|[pP][rR][oO][xX][yY]-[cC][oO][nN][nN][eE][cC][tT][iI][oO][nN]|[tT][rR][aA][iI][lL][eE][rR]|[tT][eE]|[eE][xX][pP][eE][cC][tT])$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "name": {
+              "pattern": "^(?:[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[pP][rR][oO][xX][yY]-[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[sS][eE][tT]-[cC][oO][oO][kK][iI][eE]|[xX]-[aA][pP][iI]-[kK][eE][yY])$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "$ref": "#/components/schemas/SecretReference"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "name": {
+              "pattern": "^[bB][aA][gG][gG][aA][gG][eE]$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "allOf": [
+                {
+                  "not": {
+                    "pattern": "(^|,)\\s*(?:[sS][eE][nN][tT][iI][nN][eE][lL]\\.[eE][xX][eE][cC][uU][tT][iI][oO][nN]\\.[iI][dD]|[sS][eE][nN][tT][iI][nN][eE][lL]\\.[aA][tT][tT][eE][mM][pP][tT]\\.[iI][dD])\\s*="
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "\\{\\{|\\}\\}"
+                  }
+                }
+              ],
+              "maxLength": 4096,
+              "minLength": 0,
+              "pattern": "^[\\x20-\\x7e]*$",
+              "type": "string",
+              "x-max-utf8-bytes": 4096
+            }
+          }
+        }
+      }
+    ],
+    "properties": {
+      "name": {
+        "$ref": "#/components/schemas/HeaderName"
+      },
+      "value": {
+        "oneOf": [
+          {
+            "maxLength": 8192,
+            "minLength": 0,
+            "pattern": "^[^\\u0000\\r\\n]*$",
+            "type": "string",
+            "x-max-utf8-bytes": 8192
+          },
+          {
+            "$ref": "#/components/schemas/SecretReference"
+          }
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "value"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "case-insensitive unique names",
+      "deployment credential variants require tags",
+      "decode owned baggage keys;W3C<=32 members;valid percent encoding"
+    ]
+  },
+  "RoundDecimalNormalizer": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "const": "round_decimal",
+        "type": "string"
+      },
+      "rounding": {
+        "const": "half_even",
+        "type": "string"
+      },
+      "scale": {
+        "maximum": 12,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "version": {
+        "const": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "version",
+      "scale",
+      "rounding"
+    ],
+    "type": "object"
+  },
+  "SHA256": {
+    "maxLength": 64,
+    "minLength": 64,
+    "pattern": "^[0-9a-f]{64}$",
+    "type": "string"
+  },
+  "SecretName": {
+    "maxLength": 64,
+    "minLength": 1,
+    "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+    "type": "string"
+  },
+  "SecretReference": {
+    "additionalProperties": false,
+    "properties": {
+      "$secret": {
+        "$ref": "#/components/schemas/SecretName"
+      }
+    },
+    "required": [
+      "$secret"
+    ],
+    "type": "object"
+  },
+  "Severity": {
+    "enum": [
+      "required",
+      "advisory"
+    ],
+    "type": "string"
+  },
+  "SortScalarArrayNormalizer": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "const": "sort_scalar_array",
+        "type": "string"
+      },
+      "version": {
+        "const": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "version"
+    ],
+    "type": "object"
+  },
+  "StatusCodeAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_codes": {
+        "items": {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        "maxItems": 100,
+        "minItems": 1,
+        "type": "array",
+        "uniqueItems": true
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "status_code",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "expected_codes"
+    ],
+    "type": "object"
+  },
+  "TestCaseDetail": {
+    "additionalProperties": false,
+    "properties": {
+      "active_revision": {
+        "$ref": "#/components/schemas/TestCaseRevision"
+      },
+      "active_revision_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "project_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "updated_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      }
+    },
+    "required": [
+      "id",
+      "project_id",
+      "name",
+      "active_revision_id",
+      "created_at",
+      "updated_at",
+      "active_revision"
+    ],
+    "type": "object",
+    "x-semantic-validation": [
+      "pointer equals revision.id;revision owner equals identity.id"
+    ]
+  },
+  "TestCasePage": {
+    "additionalProperties": false,
+    "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/components/schemas/TestCaseSummary"
+        },
+        "maxItems": 100,
+        "minItems": 0,
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "items",
+      "next_cursor"
+    ],
+    "type": "object",
+    "x-max-encoded-utf8-bytes": 1048576
+  },
+  "TestCaseRevision": {
+    "additionalProperties": false,
+    "properties": {
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "definition": {
+        "$ref": "#/components/schemas/CanonicalTestDefinition"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "policy_fingerprint": {
+        "$ref": "#/components/schemas/SHA256"
+      },
+      "schema_version": {
+        "const": 1,
+        "type": "integer"
+      },
+      "test_case_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "unsafe_replay_acknowledged_at": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "version": {
+        "$ref": "#/components/schemas/Version"
+      }
+    },
+    "required": [
+      "id",
+      "test_case_id",
+      "version",
+      "schema_version",
+      "definition",
+      "policy_fingerprint",
+      "unsafe_replay_acknowledged_at",
+      "created_at"
+    ],
+    "type": "object"
+  },
+  "TestCaseRevisionPage": {
+    "additionalProperties": false,
+    "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/components/schemas/TestCaseRevision"
+        },
+        "maxItems": 100,
+        "minItems": 0,
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "items",
+      "next_cursor"
+    ],
+    "type": "object",
+    "x-max-encoded-utf8-bytes": 1048576
+  },
+  "TestCaseSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "active_revision_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "active_revision_version": {
+        "$ref": "#/components/schemas/Version"
+      },
+      "created_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "project_id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "updated_at": {
+        "$ref": "#/components/schemas/Timestamp"
+      }
+    },
+    "required": [
+      "id",
+      "project_id",
+      "name",
+      "active_revision_id",
+      "created_at",
+      "updated_at",
+      "active_revision_version"
+    ],
+    "type": "object"
+  },
+  "TestCaseWrite": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "else": {
+          "properties": {
+            "unsafe_replay_acknowledgement": {
+              "type": "null"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "definition": {
+              "properties": {
+                "allow_unsafe_replay": {
+                  "const": true
+                }
+              },
+              "required": [
+                "allow_unsafe_replay"
+              ]
+            }
+          },
+          "required": [
+            "definition"
+          ]
+        },
+        "then": {
+          "properties": {
+            "unsafe_replay_acknowledgement": {
+              "const": "duplicate_effects_possible",
+              "type": "string"
+            }
+          },
+          "required": [
+            "unsafe_replay_acknowledgement"
+          ]
+        }
+      }
+    ],
+    "properties": {
+      "definition": {
+        "$ref": "#/components/schemas/TestDefinition"
+      },
+      "name": {
+        "$ref": "#/components/schemas/Name"
+      },
+      "unsafe_replay_acknowledgement": {
+        "anyOf": [
+          {
+            "const": "duplicate_effects_possible",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      }
+    },
+    "required": [
+      "name",
+      "definition"
+    ],
+    "type": "object"
+  },
+  "TestDefinition": {
+    "additionalProperties": false,
+    "properties": {
+      "allow_unsafe_replay": {
+        "default": false,
+        "type": "boolean"
+      },
+      "assertions": {
+        "default": [],
+        "items": {
+          "$ref": "#/components/schemas/Assertion"
+        },
+        "maxItems": 128,
+        "minItems": 0,
+        "type": "array"
+      },
+      "comparison_policy": {
+        "$ref": "#/components/schemas/ComparisonPolicy",
+        "default": {
+          "exact_text_body": false,
+          "performance_threshold_ms": null,
+          "schema_version": 1,
+          "selectors": [],
+          "text_body_selector": null
+        }
+      },
+      "redaction": {
+        "$ref": "#/components/schemas/Redaction",
+        "default": {
+          "header_names": [],
+          "json_pointers": [],
+          "schema_version": 1
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/Request"
+      },
+      "schema_version": {
+        "const": 1,
+        "default": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "request"
+    ],
+    "type": "object",
+    "x-max-canonical-utf8-bytes": 262144,
+    "x-max-depth": 32
+  },
+  "TextBody": {
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "const": "text",
+        "type": "string"
+      },
+      "value": {
+        "maxLength": 131072,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 131072
+      }
+    },
+    "required": [
+      "kind",
+      "value"
+    ],
+    "type": "object"
+  },
+  "TextEqualsAssertion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected": {
+        "maxLength": 131072,
+        "minLength": 0,
+        "type": "string",
+        "x-max-utf8-bytes": 131072
+      },
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "kind": {
+        "const": "text_equals",
+        "type": "string"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity",
+      "kind",
+      "expected"
+    ],
+    "type": "object"
+  },
+  "TextSelector": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/UUID"
+      },
+      "severity": {
+        "$ref": "#/components/schemas/Severity"
+      }
+    },
+    "required": [
+      "id",
+      "severity"
+    ],
+    "type": "object"
+  },
+  "Timestamp": {
+    "format": "date-time",
+    "maxLength": 27,
+    "minLength": 27,
+    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$",
+    "type": "string"
+  },
+  "UUID": {
+    "format": "uuid",
+    "maxLength": 36,
+    "minLength": 36,
+    "not": {
+      "const": "00000000-0000-0000-0000-000000000000"
+    },
+    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    "type": "string"
+  },
+  "Version": {
+    "maximum": 2147483647,
+    "minimum": 1,
+    "type": "integer"
+  }
+}

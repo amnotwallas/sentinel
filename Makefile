@@ -31,6 +31,7 @@ check-tooling:
 	uv run --frozen --project backend ruff format --check --config backend/pyproject.toml infra/check_contract.py
 	uv run --frozen --project backend mypy --strict --config-file backend/pyproject.toml infra/check_contract.py
 	node --check infra/check_planned_contracts.mjs
+	node --check frontend/scripts/generate-api.mjs
 	node frontend/node_modules/.bin/prettier --config frontend/.prettierrc.json --check infra/check_planned_contracts.mjs docs/contracts/milestone-2.openapi.json docs/contracts/milestone-2.fixtures.json
 
 check-compose-config:

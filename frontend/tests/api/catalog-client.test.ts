@@ -244,4 +244,63 @@ describe('catalog API client', () => {
     expect(result.response.status).toBe(412);
     expect(requests[0]?.headers.get('if-match')).toBe(staleEtag);
   });
+
+  it('updates a test case with generated definition and revision types', async () => {
+    const testCaseId = '00000000-0000-4000-8000-000000000010';
+    const projectId = '00000000-0000-4000-8000-000000000001';
+    const revisionId = '00000000-0000-4000-8000-000000000013';
+    const requests: Request[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return new Response(
+        JSON.stringify({
+          id: testCaseId,
+          project_id: projectId,
+          name: 'Synthetic test',
+          active_revision_id: revisionId,
+          created_at: '2030-01-01T12:30:00.000000Z',
+          updated_at: '2030-01-01T12:30:01.000000Z',
+          active_revision: {
+            id: revisionId,
+            test_case_id: testCaseId,
+            version: 2,
+            schema_version: 1,
+            definition: { request: { method: 'GET', path: '/healthz' } },
+            policy_fingerprint: 'a'.repeat(64),
+            unsafe_replay_acknowledged_at: null,
+            created_at: '2030-01-01T12:30:01.000000Z',
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            etag: `"test_case:${testCaseId}:2"`,
+          },
+        },
+      );
+    };
+    const client = createApiClient(fetcher);
+
+    const result = await client.PUT('/api/v1/test-cases/{test_case_id}', {
+      params: {
+        path: { test_case_id: testCaseId },
+        header: { 'if-match': `"test_case:${testCaseId}:1"` },
+      },
+      body: {
+        name: 'Synthetic test',
+        definition: { request: { method: 'GET', path: '/healthz' } },
+      },
+    });
+
+    expect(result.data?.active_revision.version).toBe(2);
+    expect(requests[0]?.headers.get('if-match')).toBe(
+      `"test_case:${testCaseId}:1"`,
+    );
+    expect(await requests[0]?.json()).toEqual({
+      name: 'Synthetic test',
+      definition: { request: { method: 'GET', path: '/healthz' } },
+    });
+  });
 });

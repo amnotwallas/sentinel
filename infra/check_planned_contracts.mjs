@@ -17,6 +17,12 @@ const { createConfig } = require('@redocly/openapi-core');
 const ts = require('typescript');
 const contractPath = join(root, 'docs/contracts/milestone-2.openapi.json');
 const spec = JSON.parse(readFileSync(contractPath, 'utf8'));
+const activeTestCaseSchemas = JSON.parse(
+  readFileSync(
+    join(root, 'backend/src/sentinel/api/catalog/test_case_schemas.json'),
+    'utf8',
+  ),
+);
 const fixtures = JSON.parse(
   readFileSync(join(root, 'docs/contracts/milestone-2.fixtures.json'), 'utf8'),
 );
@@ -29,6 +35,41 @@ const digest = (path) =>
 const before = artifactPaths.map(digest);
 assert.equal(spec.openapi, '3.1.0');
 assert.match(spec['x-sentinel-status'], /planned/i);
+
+const activeRoots = [
+  'TestCaseWrite',
+  'TestCaseRevision',
+  'TestCaseDetail',
+  'TestCaseSummary',
+  'TestCasePage',
+  'TestCaseRevisionPage',
+];
+const expectedActiveNames = new Set();
+const pendingActiveNames = [...activeRoots];
+while (pendingActiveNames.length > 0) {
+  const name = pendingActiveNames.pop();
+  if (expectedActiveNames.has(name)) continue;
+  const schema = spec.components.schemas[name];
+  assert.ok(schema, `Missing accepted active schema: ${name}`);
+  expectedActiveNames.add(name);
+  for (const match of JSON.stringify(schema).matchAll(
+    /#\/components\/schemas\/([^"\\]+)/g,
+  )) {
+    pendingActiveNames.push(match[1]);
+  }
+}
+assert.deepEqual(
+  Object.keys(activeTestCaseSchemas).sort(),
+  Array.from(expectedActiveNames).sort(),
+  'Active test-case schema closure drifted from the accepted contract',
+);
+for (const name of expectedActiveNames) {
+  assert.deepEqual(
+    activeTestCaseSchemas[name],
+    spec.components.schemas[name],
+    `Active test-case schema drifted: ${name}`,
+  );
+}
 
 function checkReferences(value) {
   if (value === null || typeof value !== 'object') return;
