@@ -198,6 +198,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Assertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["HeaderPresentAssertion"] | components["schemas"]["HeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
+        CIDR: string;
         CanonicalAssertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["CanonicalHeaderPresentAssertion"] | components["schemas"]["CanonicalHeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
         CanonicalComparisonPolicy: {
             /** @default false */
@@ -213,6 +214,22 @@ export interface components {
             /** @default null */
             text_body_selector: components["schemas"]["TextSelector"] | null;
         } & unknown;
+        CanonicalEnvironmentDocument: {
+            /** Format: uri */
+            base_url: string;
+            /**
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** @default [] */
+            secret_references: components["schemas"]["SecretReference"][];
+            target_policy: components["schemas"]["CanonicalTargetPolicy"];
+            /** @default {} */
+            variables: {
+                [key: string]: string;
+            };
+        };
         CanonicalHeaderEqualsAssertion: {
             expected: string;
             header_name: components["schemas"]["CanonicalHeaderName"];
@@ -284,6 +301,23 @@ export interface components {
             name: components["schemas"]["CanonicalHeaderName"];
             value: string | components["schemas"]["SecretReference"];
         } & (unknown & unknown & unknown);
+        CanonicalTargetPolicy: {
+            /** @default [] */
+            allowed_cidrs: components["schemas"]["CIDR"][];
+            /** @default [] */
+            allowed_hostnames: components["schemas"]["Hostname"][];
+            /** @default null */
+            allowed_ports: number[] | null;
+            /** @default [] */
+            denied_cidrs: components["schemas"]["CIDR"][];
+            /** @default [] */
+            denied_hostnames: components["schemas"]["Hostname"][];
+            /**
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
         CanonicalTestDefinition: {
             /** @default false */
             allow_unsafe_replay: boolean;
@@ -316,93 +350,73 @@ export interface components {
         Cursor: string;
         /** @description Finite original decimal token <=38 significant digits, adjusted exponent -128..128; canonical plain decimal/negative zero0; no binary float decision. */
         DecimalNumber: number;
-        /** EnvironmentCreate */
         EnvironmentCreate: {
             definition: components["schemas"]["EnvironmentDocument"];
-            /** Name */
-            name: string;
+            name: components["schemas"]["Name"];
         };
-        /** EnvironmentDetail */
         EnvironmentDetail: {
             active_revision: components["schemas"]["EnvironmentRevision"];
-            /** Active Revision Id */
-            active_revision_id: string;
-            /** Created At */
-            created_at: string;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Project Id */
-            project_id: string;
-            /** Updated At */
-            updated_at: string;
+            active_revision_id: components["schemas"]["UUID"];
+            created_at: components["schemas"]["Timestamp"];
+            id: components["schemas"]["UUID"];
+            name: components["schemas"]["Name"];
+            project_id: components["schemas"]["UUID"];
+            updated_at: components["schemas"]["Timestamp"];
         };
-        /** EnvironmentDocument */
+        /** @description Exact tagged declarations, descriptive only; no aliases/grants/value or resolution. */
         EnvironmentDocument: {
-            /** Base Url */
+            /** Format: uri */
             base_url: string;
             /**
-             * Schema Version
              * @default 1
              * @constant
              */
             schema_version?: 1;
-            /** Secret References */
+            /** @default [] */
             secret_references?: components["schemas"]["SecretReference"][];
+            /**
+             * @default {
+             *       "allowed_cidrs": [],
+             *       "allowed_hostnames": [],
+             *       "allowed_ports": null,
+             *       "denied_cidrs": [],
+             *       "denied_hostnames": [],
+             *       "schema_version": 1
+             *     }
+             */
             target_policy?: components["schemas"]["TargetPolicy"];
-            /** Variables */
+            /** @default {} */
             variables?: {
                 [key: string]: string;
             };
         };
-        /** EnvironmentPage */
+        /** @description Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page. */
         EnvironmentPage: {
-            /** Items */
             items: components["schemas"]["EnvironmentSummary"][];
-            /** Next Cursor */
-            next_cursor: string | null;
+            next_cursor: components["schemas"]["Cursor"] | null;
         };
-        /** EnvironmentPatch */
+        /** @description Nonempty:whole definition replacement=>new revision;name-only=>state_version/change event,no revision. */
         EnvironmentPatch: {
-            definition?: components["schemas"]["EnvironmentDocument"] | null;
-            /** Name */
-            name?: string | null;
-        };
-        /** EnvironmentRevision */
+            definition?: components["schemas"]["EnvironmentDocument"];
+            name?: components["schemas"]["Name"];
+        } | unknown | unknown;
         EnvironmentRevision: {
-            /** Created At */
-            created_at: string;
-            definition: components["schemas"]["EnvironmentDocument"];
-            /** Environment Id */
-            environment_id: string;
-            /** Id */
-            id: string;
-            /**
-             * Schema Version
-             * @default 1
-             * @constant
-             */
-            schema_version?: 1;
-            /** Version */
-            version: number;
+            created_at: components["schemas"]["Timestamp"];
+            definition: components["schemas"]["CanonicalEnvironmentDocument"];
+            environment_id: components["schemas"]["UUID"];
+            id: components["schemas"]["UUID"];
+            /** @constant */
+            schema_version: 1;
+            version: components["schemas"]["Version"];
         };
-        /** EnvironmentSummary */
         EnvironmentSummary: {
-            /** Active Revision Id */
-            active_revision_id: string;
-            /** Active Revision Version */
-            active_revision_version: number;
-            /** Created At */
-            created_at: string;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Project Id */
-            project_id: string;
-            /** Updated At */
-            updated_at: string;
+            active_revision_id: components["schemas"]["UUID"];
+            active_revision_version: components["schemas"]["Version"];
+            created_at: components["schemas"]["Timestamp"];
+            id: components["schemas"]["UUID"];
+            name: components["schemas"]["Name"];
+            project_id: components["schemas"]["UUID"];
+            updated_at: components["schemas"]["Timestamp"];
         };
         /** FieldError */
         FieldError: {
@@ -443,6 +457,8 @@ export interface components {
             kind: "header_present";
             severity: components["schemas"]["Severity"];
         };
+        /** @description Exact lowercase IDNA; no wildcard/port/template/trailing dot; IP uses CIDR. */
+        Hostname: string;
         JSONAbsentAssertion: {
             id: components["schemas"]["UUID"];
             /**
@@ -684,34 +700,20 @@ export interface components {
             /** @constant */
             type?: "urn:sentinel:problem:http_error";
         });
-        /** Project */
         Project: {
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Deleted At */
+            created_at: components["schemas"]["Timestamp"];
+            /** @description M2 deletion excluded. */
             deleted_at: null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Name */
-            name: string;
+            id: components["schemas"]["UUID"];
+            name: components["schemas"]["Name"];
         };
-        /** ProjectCreate */
         ProjectCreate: {
-            /** Name */
-            name: string;
+            name: components["schemas"]["Name"];
         };
-        /** ProjectPage */
+        /** @description Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page. */
         ProjectPage: {
-            /** Items */
             items: components["schemas"]["Project"][];
-            /** Next Cursor */
-            next_cursor: string | null;
+            next_cursor: components["schemas"]["Cursor"] | null;
         };
         QueryParameter: {
             name: string;
@@ -856,20 +858,18 @@ export interface components {
             name: components["schemas"]["Name"];
             test_case_revision_ids: components["schemas"]["UUID"][];
         };
-        /** TargetPolicy */
         TargetPolicy: {
-            /** Allowed Cidrs */
-            allowed_cidrs?: string[];
-            /** Allowed Hostnames */
-            allowed_hostnames?: string[];
-            /** Allowed Ports */
+            /** @default [] */
+            allowed_cidrs?: components["schemas"]["CIDR"][];
+            /** @default [] */
+            allowed_hostnames?: components["schemas"]["Hostname"][];
+            /** @default null */
             allowed_ports?: number[] | null;
-            /** Denied Cidrs */
-            denied_cidrs?: string[];
-            /** Denied Hostnames */
-            denied_hostnames?: string[];
+            /** @default [] */
+            denied_cidrs?: components["schemas"]["CIDR"][];
+            /** @default [] */
+            denied_hostnames?: components["schemas"]["Hostname"][];
             /**
-             * Schema Version
              * @default 1
              * @constant
              */
@@ -976,6 +976,7 @@ export interface components {
         Timestamp: string;
         /** Format: uuid */
         UUID: string;
+        VariableName: string;
         Version: number;
     };
     responses: never;

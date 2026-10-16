@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from sentinel.catalog.environments import (
     Environment,
     EnvironmentRevisionConflict,
     EnvironmentService,
+    EnvironmentVersionExhausted,
 )
 from sentinel.catalog.projects import Project
 from sentinel.security.definition_policy import validate_environment_document
@@ -170,3 +172,43 @@ def test_get_list_and_name_only_update_preserve_active_revision() -> None:
     assert updated.active_revision_id == created.active_revision_id
     assert updated.active_revision.version == 1
     assert updated.state_version == 2
+
+
+@pytest.mark.parametrize(
+    ("state_version", "revision_version"),
+    [(2_147_483_647, 1), (1, 2_147_483_647)],
+)
+def test_environment_update_rejects_version_exhaustion_before_writing(
+    state_version: int,
+    revision_version: int,
+) -> None:
+    unit_of_work = MemoryUnitOfWork()
+    ids = iter([ENVIRONMENT_ID, REVISION_1_ID, EVENT_1_ID, REVISION_2_ID, EVENT_2_ID])
+    service = EnvironmentService(
+        lambda: unit_of_work,
+        ids=lambda: next(ids),
+        clock=lambda: NOW,
+        validate_document=validate_environment_document,
+    )
+    created = service.create(
+        PROJECT_ID,
+        name="Production",
+        definition={"base_url": "https://example.com"},
+    )
+    exhausted = replace(
+        created,
+        state_version=state_version,
+        active_revision=replace(created.active_revision, version=revision_version),
+    )
+    unit_of_work.environments.items[ENVIRONMENT_ID] = exhausted
+
+    with pytest.raises(EnvironmentVersionExhausted):
+        service.update(
+            ENVIRONMENT_ID,
+            expected_state_version=state_version,
+            name=None,
+            definition={"base_url": "https://v2.example.com"},
+        )
+
+    assert unit_of_work.commits == 1
+    assert len(unit_of_work.changes.items) == 1

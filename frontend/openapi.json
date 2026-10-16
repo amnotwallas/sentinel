@@ -42,6 +42,17 @@
           }
         ]
       },
+      "CIDR": {
+        "maxLength": 64,
+        "minLength": 3,
+        "pattern": "^[0-9a-f:.]+/(?:0|[1-9][0-9]{0,2})$",
+        "type": "string",
+        "x-semantic-validation": [
+          "strict address parsing",
+          "no host bits",
+          "IPv4 prefix<=32;IPv6<=128"
+        ]
+      },
       "CanonicalAssertion": {
         "discriminator": {
           "mapping": {
@@ -171,6 +182,71 @@
           "SHA256 over complete default-materialized canonical policy",
           "object keys sorted;array order preserved;no float intermediate"
         ]
+      },
+      "CanonicalEnvironmentDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^https?://[^@/?#\\\\\\s]+(?:/[^?#\\\\\\s]*)?$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048,
+            "x-normalization": [
+              "lowercase IDNA",
+              "canonical IPv6",
+              "remove default port",
+              "trailing slash"
+            ],
+            "x-semantic-validation": [
+              "valid authority/port",
+              "no dot segments",
+              "no template"
+            ]
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          },
+          "secret_references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SecretReference"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "target_policy": {
+            "$ref": "#/components/schemas/CanonicalTargetPolicy"
+          },
+          "variables": {
+            "additionalProperties": {
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string",
+              "x-max-utf8-bytes": 4096
+            },
+            "default": {},
+            "maxProperties": 128,
+            "propertyNames": {
+              "$ref": "#/components/schemas/VariableName"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema_version",
+          "base_url",
+          "variables",
+          "secret_references",
+          "target_policy"
+        ],
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144
       },
       "CanonicalHeaderEqualsAssertion": {
         "additionalProperties": false,
@@ -472,6 +548,90 @@
         "required": ["name", "value"],
         "type": "object"
       },
+      "CanonicalTargetPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "allowed_ports": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 128,
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "denied_cidrs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CIDR"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "denied_hostnames": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            },
+            "maxItems": 128,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "allowed_hostnames",
+          "allowed_cidrs",
+          "denied_hostnames",
+          "denied_cidrs",
+          "allowed_ports"
+        ],
+        "type": "object",
+        "x-semantic-validation": [
+          "deployment deny wins",
+          "ports only narrow deployment",
+          "explicit allow exceptions for blocked addresses",
+          "static syntax only;future worker DNS/address checks"
+        ]
+      },
       "CanonicalTestDefinition": {
         "additionalProperties": false,
         "properties": {
@@ -624,14 +784,10 @@
             "$ref": "#/components/schemas/EnvironmentDocument"
           },
           "name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": ["name", "definition"],
-        "title": "EnvironmentCreate",
         "type": "object"
       },
       "EnvironmentDetail": {
@@ -641,28 +797,22 @@
             "$ref": "#/components/schemas/EnvironmentRevision"
           },
           "active_revision_id": {
-            "title": "Active Revision Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "created_at": {
-            "title": "Created At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           },
           "id": {
-            "title": "Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "name": {
-            "title": "Name",
-            "type": "string"
+            "$ref": "#/components/schemas/Name"
           },
           "project_id": {
-            "title": "Project Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "updated_at": {
-            "title": "Updated At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           }
         },
         "required": [
@@ -674,177 +824,184 @@
           "updated_at",
           "active_revision"
         ],
-        "title": "EnvironmentDetail",
-        "type": "object"
+        "type": "object",
+        "x-semantic-validation": [
+          "pointer equals revision.id;revision owner equals identity.id"
+        ]
       },
       "EnvironmentDocument": {
         "additionalProperties": false,
+        "description": "Exact tagged declarations, descriptive only; no aliases/grants/value or resolution.",
         "properties": {
           "base_url": {
+            "format": "uri",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "Base Url",
-            "type": "string"
+            "pattern": "^https?://[^@/?#\\\\\\s]+(?:/[^?#\\\\\\s]*)?$",
+            "type": "string",
+            "x-max-utf8-bytes": 2048,
+            "x-normalization": [
+              "lowercase IDNA",
+              "canonical IPv6",
+              "remove default port",
+              "trailing slash"
+            ],
+            "x-semantic-validation": [
+              "valid authority/port",
+              "no dot segments",
+              "no template"
+            ]
           },
           "schema_version": {
             "const": 1,
             "default": 1,
-            "title": "Schema Version",
             "type": "integer"
           },
           "secret_references": {
+            "default": [],
             "items": {
               "$ref": "#/components/schemas/SecretReference"
             },
             "maxItems": 128,
-            "title": "Secret References",
-            "type": "array"
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "target_policy": {
-            "$ref": "#/components/schemas/TargetPolicy"
+            "$ref": "#/components/schemas/TargetPolicy",
+            "default": {
+              "allowed_cidrs": [],
+              "allowed_hostnames": [],
+              "allowed_ports": null,
+              "denied_cidrs": [],
+              "denied_hostnames": [],
+              "schema_version": 1
+            }
           },
           "variables": {
             "additionalProperties": {
-              "type": "string"
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string",
+              "x-max-utf8-bytes": 4096
             },
-            "title": "Variables",
+            "default": {},
+            "maxProperties": 128,
+            "propertyNames": {
+              "$ref": "#/components/schemas/VariableName"
+            },
             "type": "object"
           }
         },
         "required": ["base_url"],
-        "title": "EnvironmentDocument",
-        "type": "object"
+        "type": "object",
+        "x-max-canonical-utf8-bytes": 262144
       },
       "EnvironmentPage": {
         "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
         "properties": {
           "items": {
             "items": {
               "$ref": "#/components/schemas/EnvironmentSummary"
             },
             "maxItems": 100,
-            "title": "Items",
+            "minItems": 0,
             "type": "array"
           },
           "next_cursor": {
             "anyOf": [
               {
-                "maxLength": 2048,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": ["items", "next_cursor"],
-        "title": "EnvironmentPage",
-        "type": "object"
-      },
-      "EnvironmentPatch": {
-        "additionalProperties": false,
-        "properties": {
-          "definition": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EnvironmentDocument"
+                "$ref": "#/components/schemas/Cursor"
               },
               {
                 "type": "null"
               }
             ]
-          },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 120,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
           }
         },
-        "title": "EnvironmentPatch",
+        "required": ["items", "next_cursor"],
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
+      },
+      "EnvironmentPatch": {
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": ["name"]
+          },
+          {
+            "required": ["definition"]
+          }
+        ],
+        "description": "Nonempty:whole definition replacement=>new revision;name-only=>state_version/change event,no revision.",
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/EnvironmentDocument"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "required": [],
         "type": "object"
       },
       "EnvironmentRevision": {
         "additionalProperties": false,
         "properties": {
           "created_at": {
-            "title": "Created At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           },
           "definition": {
-            "$ref": "#/components/schemas/EnvironmentDocument"
+            "$ref": "#/components/schemas/CanonicalEnvironmentDocument"
           },
           "environment_id": {
-            "title": "Environment Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "id": {
-            "title": "Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "schema_version": {
             "const": 1,
-            "default": 1,
-            "title": "Schema Version",
             "type": "integer"
           },
           "version": {
-            "minimum": 1.0,
-            "title": "Version",
-            "type": "integer"
+            "$ref": "#/components/schemas/Version"
           }
         },
         "required": [
           "id",
           "environment_id",
           "version",
+          "schema_version",
           "definition",
           "created_at"
         ],
-        "title": "EnvironmentRevision",
         "type": "object"
       },
       "EnvironmentSummary": {
         "additionalProperties": false,
         "properties": {
           "active_revision_id": {
-            "title": "Active Revision Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "active_revision_version": {
-            "minimum": 1.0,
-            "title": "Active Revision Version",
-            "type": "integer"
+            "$ref": "#/components/schemas/Version"
           },
           "created_at": {
-            "title": "Created At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           },
           "id": {
-            "title": "Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "name": {
-            "title": "Name",
-            "type": "string"
+            "$ref": "#/components/schemas/Name"
           },
           "project_id": {
-            "title": "Project Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "updated_at": {
-            "title": "Updated At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           }
         },
         "required": [
@@ -856,7 +1013,6 @@
           "updated_at",
           "active_revision_version"
         ],
-        "title": "EnvironmentSummary",
         "type": "object"
       },
       "FieldError": {
@@ -959,6 +1115,16 @@
         },
         "required": ["id", "severity", "kind", "header_name"],
         "type": "object"
+      },
+      "Hostname": {
+        "description": "Exact lowercase IDNA; no wildcard/port/template/trailing dot; IP uses CIDR.",
+        "maxLength": 253,
+        "minLength": 1,
+        "not": {
+          "pattern": "^[0-9.]+$"
+        },
+        "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$",
+        "type": "string"
       },
       "JSONAbsentAssertion": {
         "additionalProperties": false,
@@ -1574,73 +1740,58 @@
         "additionalProperties": false,
         "properties": {
           "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
+            "$ref": "#/components/schemas/Timestamp"
           },
           "deleted_at": {
-            "title": "Deleted At",
+            "description": "M2 deletion excluded.",
             "type": "null"
           },
           "id": {
-            "format": "uuid",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-            "title": "Id",
-            "type": "string"
+            "$ref": "#/components/schemas/UUID"
           },
           "name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": ["id", "name", "created_at", "deleted_at"],
-        "title": "Project",
         "type": "object"
       },
       "ProjectCreate": {
         "additionalProperties": false,
         "properties": {
           "name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": ["name"],
-        "title": "ProjectCreate",
         "type": "object"
       },
       "ProjectPage": {
         "additionalProperties": false,
+        "description": "Identity lists use complete summaries;revision history uses complete canonical revisions. Count/byte bounded keyset page.",
         "properties": {
           "items": {
             "items": {
               "$ref": "#/components/schemas/Project"
             },
             "maxItems": 100,
-            "title": "Items",
+            "minItems": 0,
             "type": "array"
           },
           "next_cursor": {
             "anyOf": [
               {
-                "maxLength": 2048,
-                "minLength": 1,
-                "type": "string"
+                "$ref": "#/components/schemas/Cursor"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Next Cursor"
+            ]
           }
         },
         "required": ["items", "next_cursor"],
-        "title": "ProjectPage",
-        "type": "object"
+        "type": "object",
+        "x-max-encoded-utf8-bytes": 1048576
       },
       "QueryParameter": {
         "additionalProperties": false,
@@ -2213,61 +2364,78 @@
         "additionalProperties": false,
         "properties": {
           "allowed_cidrs": {
+            "default": [],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/CIDR"
             },
             "maxItems": 128,
-            "title": "Allowed Cidrs",
-            "type": "array"
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "allowed_hostnames": {
+            "default": [],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Hostname"
             },
             "maxItems": 128,
-            "title": "Allowed Hostnames",
-            "type": "array"
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "allowed_ports": {
             "anyOf": [
               {
                 "items": {
+                  "maximum": 65535,
+                  "minimum": 1,
                   "type": "integer"
                 },
                 "maxItems": 128,
-                "type": "array"
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Allowed Ports"
+            "default": null
           },
           "denied_cidrs": {
+            "default": [],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/CIDR"
             },
             "maxItems": 128,
-            "title": "Denied Cidrs",
-            "type": "array"
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "denied_hostnames": {
+            "default": [],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Hostname"
             },
             "maxItems": 128,
-            "title": "Denied Hostnames",
-            "type": "array"
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "schema_version": {
             "const": 1,
             "default": 1,
-            "title": "Schema Version",
             "type": "integer"
           }
         },
-        "title": "TargetPolicy",
-        "type": "object"
+        "required": [],
+        "type": "object",
+        "x-semantic-validation": [
+          "deployment deny wins",
+          "ports only narrow deployment",
+          "explicit allow exceptions for blocked addresses",
+          "static syntax only;future worker DNS/address checks"
+        ]
       },
       "TestCaseDetail": {
         "additionalProperties": false,
@@ -2620,6 +2788,12 @@
           "const": "00000000-0000-0000-0000-000000000000"
         },
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "VariableName": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
         "type": "string"
       },
       "Version": {

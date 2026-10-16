@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from sentinel.api.body_limit import BodyLimitMiddleware
+from sentinel.api.catalog.catalog_openapi import catalog_schemas
 from sentinel.api.catalog.environments import environment_router
 from sentinel.api.catalog.projects import project_router
 from sentinel.api.catalog.suite_openapi import suite_schemas
@@ -41,7 +42,8 @@ Probe = Callable[[], Awaitable[bool]]
 class SentinelAPI(FastAPI):
     def openapi(self) -> dict[str, Any]:
         schema = super().openapi()
-        schema.setdefault("components", {}).setdefault("schemas", {}).update(test_case_schemas())
+        schema.setdefault("components", {}).setdefault("schemas", {}).update(catalog_schemas())
+        schema["components"]["schemas"].update(test_case_schemas())
         schema["components"]["schemas"].update(suite_schemas())
         # FastAPI always adds its default JSON media type for a documented model.
         # Sentinel problem responses use RFC 9457's dedicated media type instead.

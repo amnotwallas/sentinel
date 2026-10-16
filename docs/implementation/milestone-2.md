@@ -1,6 +1,6 @@
 # Milestone 2 wire contracts and integration packet
 
-Status: implementation-ready design baseline for the future task packets; M2-06 test-case catalog functionality is integrated and M2-07 suite implementation is in progress. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual catalog persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This document is not authorization to begin an unapproved feature.
+Status: M2-00 through M2-07 are integrated; the M2-08 local acceptance candidate is complete and pending authorized integration and remote CI. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual catalog persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This document is not authorization to begin an unapproved feature.
 
 ## Implementation ledger
 
@@ -12,8 +12,21 @@ tests, migration upgrade/downgrade/drift checks, generated-contract checks, and
 Compose/worker/readiness smoke checks. The M2-06 acceptance review found and
 corrected seven defects covering ETag handling, ownership constraints, bounded
 history responses, sanitized secret/replay errors, version exhaustion, exact
-decimal persistence, and runtime/generated OpenAPI alignment. M2-07 is the next
-authorized slice; M2-08 acceptance and integration remain future work.
+decimal persistence, and runtime/generated OpenAPI alignment. M2-07 ordered
+suites are integrated on `main` at
+`1e396ddff50893fc4b6bd0db320075f90faf186f`; the user reported GitHub Actions
+workflow #6 succeeded for that SHA.
+
+M2-08 independently reviewed the combined catalog and locally corrected five
+confirmed findings: environment active-revision ownership, environment version
+exhaustion, environment ETag edge semantics, project/environment runtime OpenAPI
+fidelity, and environment null/error-pointer boundary behavior. The isolated
+candidate passes 176 non-integration backend tests, 59 real-PostgreSQL tests
+(235 total), 9 frontend tests, exact runtime/planned contract checks, Alembic
+upgrade/downgrade/drift and data-preservation checks, wheel resource inspection,
+and full Compose API/worker/frontend/Tempo-outage acceptance. These are local
+results only. Milestone 2 remains open until this candidate is integrated and
+all required GitHub Actions jobs pass on the exact final SHA.
 
 ## 1. Scope and decision provenance
 
@@ -393,21 +406,21 @@ Readiness must compare the database revision against the running package's suppo
 
 Minimum named contract fixtures: project create/list/notfound; environment create/rename/full-definition change; valid strict test document containing synthetic reference; rejected credential literal/context; unrelated baggage allowed; canonical reordered-object/numeric vectors; explicit unsafe replay consent; stale/missing/malformed ETag; cross-scope/invalid cursor; suite exact revision order/duplicate case/missing membership; two concurrent writes one412; transaction rollback leaves no history; catalog reads invoke no DNS/dispatch/secret resolver; canaries absent from API/logs/spans/database; future queued/evaluated/ambiguous/expired-artifact/missing-Tempo result; inventory-only and needs-configuration OpenAPI previews with no external fetch.
 
-The current repository implements health, projects, the versioned environment API,
-and immutable test-case revisions alongside probe execution/job rows. Ordered
-suites remain the active M2-07 implementation slice. The planned schema stays
-broader than the active generated contract; each slice must be implemented and
-verified before runtime regeneration.
+The current repository implements health and all 16 M2 catalog operations for
+projects, versioned environments, immutable test-case revisions, and ordered
+suites pinned to exact test-case revisions alongside the M1 probe execution/job
+rows. M2-08's reviewed candidate synchronizes the implemented runtime catalog
+schemas with the accepted planned contract without registering M3 routes.
 
 ## 12. Machine-readable handoff and implementation start
 
 [Planned OpenAPI](../contracts/milestone-2.openapi.json) defines the catalog routes
 and future components. [Synthetic fixtures](../contracts/milestone-2.fixtures.json)
-provide named transport examples. Neither is the active API: `frontend/openapi.json`
-and its generated TypeScript describe only the implemented health, project, and
-environment endpoints.
-Generate planned client types only into a temporary directory; do not replace the
-runtime artifacts or register planned routes during this prerequisite task.
+provide named transport examples. `frontend/openapi.json` and its generated
+TypeScript remain the active API artifacts and contain the implemented health and
+M2 catalog routes only. Planned M3-and-later schemas remain planning artifacts;
+do not register their routes or replace runtime artifacts with unimplemented
+operations.
 
 Run `make check-planned-contract` for the executable planning gate. Its existing
 locked generator uses explicit discriminator mappings, `defaultNonNullable: false`
@@ -432,8 +445,7 @@ check runs no migration environment or upgrade; Tempo degradation is independent
 The supported source checkout and Docker image ship these assets together; a
 standalone wheel without them fails closed and is not a supported deployment.
 
-M2-01 catalog fixture cleanup now covers project and environment foreign keys.
-M2-02 projects are integrated, and the M2-03 environment slice includes active
-Pydantic/OpenAPI generation and typed client consumption. Later M2 slices remain
-governed by the worktree handoff process in
+M2-01 catalog fixture cleanup now covers every integrated catalog foreign key.
+M2-02 through M2-07 are integrated with active OpenAPI generation and typed client
+consumption. M2-08 remains governed by the worktree handoff and final-CI rule in
 [workflow](../development/workflow.md#starting-parallel-work).

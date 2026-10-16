@@ -379,10 +379,10 @@ async def test_runtime_openapi_publishes_the_implemented_catalog_slices(
     )
     assert {"Project", "ProjectCreate", "ProjectPage"} <= set(document["components"]["schemas"])
     project_schema = document["components"]["schemas"]["Project"]
-    assert project_schema["properties"]["id"]["format"] == "uuid"
-    assert project_schema["properties"]["created_at"]["format"] == "date-time"
+    assert project_schema["properties"]["id"] == {"$ref": "#/components/schemas/UUID"}
+    assert project_schema["properties"]["created_at"] == {"$ref": "#/components/schemas/Timestamp"}
     name_schema = document["components"]["schemas"]["ProjectCreate"]["properties"]["name"]
-    assert (name_schema["minLength"], name_schema["maxLength"]) == (1, 120)
+    assert name_schema == {"$ref": "#/components/schemas/Name"}
     problem_schema = document["components"]["schemas"]["Problem"]
     assert problem_schema["properties"]["errors"]["type"] == "array"
     assert problem_schema["properties"]["errors"]["minItems"] == 1

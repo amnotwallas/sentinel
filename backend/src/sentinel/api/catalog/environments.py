@@ -1,9 +1,17 @@
+import re
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, Path, Query, Request, Response
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from sentinel.api.catalog.pagination import (
     CursorInvalid,
@@ -19,10 +27,18 @@ from sentinel.catalog.environments import (
     EnvironmentRevisionConflict,
     EnvironmentService,
     EnvironmentValidationError,
+    EnvironmentVersionExhausted,
 )
-from sentinel.catalog.projects import ProjectNotFound, ProjectValidationError
+from sentinel.catalog.projects import (
+    ProjectNotFound,
+    ProjectValidationError,
+    normalize_project_name,
+)
 
 _UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+_ETAG_PATTERN = re.compile(
+    rf'^"((?:project|environment|test_case|suite)):({_UUID_PATTERN[1:-1]}):([1-9][0-9]*)"$'
+)
 _PROBLEMS: dict[int | str, dict[str, Any]] = {
     status: {
         "model": Problem,
@@ -70,11 +86,40 @@ class EnvironmentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     definition: EnvironmentDocument
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def valid_name(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        try:
+            return normalize_project_name(value)
+        except ProjectValidationError:
+            raise ValueError("invalid environment name") from None
+
 
 class EnvironmentPatch(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     name: str | None = Field(default=None, min_length=1, max_length=120)
     definition: EnvironmentDocument | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def valid_name(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("environment name cannot be null")
+        if not isinstance(value, str):
+            return value
+        try:
+            return normalize_project_name(value)
+        except ProjectValidationError:
+            raise ValueError("invalid environment name") from None
+
+    @field_validator("definition", mode="before")
+    @classmethod
+    def definition_is_not_null(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("environment definition cannot be null")
+        return value
 
     @model_validator(mode="after")
     def nonempty(self) -> "EnvironmentPatch":
@@ -191,8 +236,41 @@ def _etag(environment: DomainEnvironment) -> str:
 
 
 def _uuid(value: str) -> UUID | None:
-    parsed = UUID(value)
-    return parsed if parsed.int != 0 else None
+    try:
+        parsed = UUID(value)
+    except ValueError:
+        return None
+    return parsed if parsed.int != 0 and str(parsed) == value else None
+
+
+def _parse_if_match(value: str | None, environment_id: UUID) -> int | Response:
+    if value is None:
+        return problem(428, "revision_precondition_required", "Revision precondition required")
+    match = _ETAG_PATTERN.fullmatch(value)
+    if match is None:
+        return field_problem(
+            422,
+            "validation_failed",
+            "Request validation failed",
+            location="header",
+            pointer="/if-match",
+            field_code="value_invalid",
+        )
+    resource_kind, raw_id, raw_version = match.groups()
+    resource_id = _uuid(raw_id)
+    version = int(raw_version)
+    if resource_id is None or version > 2_147_483_647:
+        return field_problem(
+            422,
+            "validation_failed",
+            "Request validation failed",
+            location="header",
+            pointer="/if-match",
+            field_code="value_invalid",
+        )
+    if resource_kind != "environment" or resource_id != environment_id:
+        return problem(412, "revision_conflict", "Revision conflict")
+    return version
 
 
 def environment_router(service: EnvironmentService) -> APIRouter:
@@ -242,7 +320,16 @@ def environment_router(service: EnvironmentService) -> APIRouter:
             )
         except ProjectNotFound:
             return problem(404, "resource_not_found", "Request failed")
-        except (EnvironmentValidationError, ProjectValidationError):
+        except ProjectValidationError:
+            return field_problem(
+                422,
+                "validation_failed",
+                "Request validation failed",
+                location="body",
+                pointer="/name",
+                field_code="value_invalid",
+            )
+        except EnvironmentValidationError:
             return field_problem(
                 422,
                 "validation_failed",
@@ -356,22 +443,10 @@ def environment_router(service: EnvironmentService) -> APIRouter:
                 pointer="/environment_id",
                 field_code="invalid_uuid",
             )
-        if if_match is None:
-            return problem(428, "revision_precondition_required", "Revision precondition required")
-        prefix = f'"environment:{parsed_id}:'
-        if not if_match.startswith(prefix) or not if_match.endswith('"'):
-            return field_problem(
-                422,
-                "validation_failed",
-                "Request validation failed",
-                location="header",
-                pointer="/if-match",
-                field_code="value_invalid",
-            )
+        expected = _parse_if_match(if_match, parsed_id)
+        if not isinstance(expected, int):
+            return expected
         try:
-            expected = int(if_match[len(prefix) : -1])
-            if expected < 1 or str(expected) != if_match[len(prefix) : -1]:
-                raise ValueError
             environment = service.update(
                 parsed_id,
                 expected_state_version=expected,
@@ -382,20 +457,22 @@ def environment_router(service: EnvironmentService) -> APIRouter:
                     else None
                 ),
             )
-        except ValueError:
-            return field_problem(
-                422,
-                "validation_failed",
-                "Request validation failed",
-                location="header",
-                pointer="/if-match",
-                field_code="value_invalid",
-            )
         except EnvironmentNotFound:
             return problem(404, "resource_not_found", "Request failed")
         except EnvironmentRevisionConflict:
             return problem(412, "revision_conflict", "Revision conflict")
-        except (EnvironmentValidationError, ProjectValidationError):
+        except EnvironmentVersionExhausted:
+            return problem(409, "resource_conflict", "Resource conflict")
+        except ProjectValidationError:
+            return field_problem(
+                422,
+                "validation_failed",
+                "Request validation failed",
+                location="body",
+                pointer="/name",
+                field_code="value_invalid",
+            )
+        except EnvironmentValidationError:
             return field_problem(
                 422,
                 "validation_failed",

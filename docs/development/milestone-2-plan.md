@@ -1,8 +1,11 @@
 # Milestone 2 task plan
 
-Milestone 2 implementation is in progress. The schema-readiness prerequisite,
-project API, versioned environment API, typed-client acceptance coverage, and test
-definition policy are integrated. Scope and exit criteria come from
+Milestone 2 implementation is in final acceptance. M2-00 through M2-07 are
+integrated on `main` at `1e396ddff50893fc4b6bd0db320075f90faf186f`; the user
+reported GitHub Actions workflow #6 succeeded for that SHA. M2-08 local review
+and correction are complete in an isolated candidate, but milestone acceptance
+remains pending integration and remote CI on the final SHA. Scope and exit
+criteria come from
 [ROADMAP.md](../ROADMAP.md#milestone-2-versioned-catalog-and-definition-api),
 with endpoint inventory in [MVP.md](../MVP.md#api-acceptance-contract). The accepted
 [architecture](../architecture/README.md) and ADRs remain unchanged. Milestone 1
@@ -220,6 +223,10 @@ writes client-consumption tests/source, not generated artifacts.
 
 ### M2-07 — Ordered suites pinned to exact test revisions
 
+Status: integrated on `main` at
+`1e396ddff50893fc4b6bd0db320075f90faf186f`; GitHub Actions workflow #6 success
+is user-reported.
+
 - **Objective:** Create/list/read/update ordered immutable suites through the API.
 - **Owned files:** Backend's `catalog/suites.py`, `persistence/catalog/suites.py`,
   `api/catalog/suites.py`, allocated suite/item migration, `test_suites.py` files.
@@ -234,6 +241,11 @@ writes client-consumption tests/source, not generated artifacts.
 - **Parallel:** Frontend extends test-case client tests; QA reviews M2-06.
 
 ### M2-08 — Independent acceptance/security review and milestone integration
+
+Status: local acceptance candidate complete. Full backend, PostgreSQL,
+frontend, contract, migration, packaging, and Compose gates pass after focused
+corrections. Final acceptance remains pending authorized integration and all
+required remote CI jobs on the resulting SHA.
 
 - **Objective:** Verify the complete API definition journey and all M2 exit criteria.
 - **Owned files:** QA's proposed `tests/integration/test_catalog_acceptance.py` and

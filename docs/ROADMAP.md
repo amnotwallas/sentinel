@@ -41,7 +41,7 @@ was committed and pushed to `amnotwallas/sentinel` on `main` as
 `62635ea71566dc8e21118667a393ed944f6a0cce`. The user confirmed all GitHub Actions
 backend, frontend, and Compose jobs passed. The run URL/logs were not independently
 captured in this checkout; this CI status is user-reported. Milestone 2 is in
-progress. M2-00 through M2-06 are integrated on `main`; M2-03 is commit
+progress. M2-00 through M2-07 are integrated on `main`; M2-03 is commit
 `fc9c3aa46838fa2b6f754f8973990d5480b8bede`. The user confirmed GitHub Actions
 run #3 completed successfully in 1 minute 18 seconds, including a frontend Vitest
 summary of 2 passing files and 4 passing tests. The run URL and individual backend
@@ -52,7 +52,12 @@ definition validation is integrated as
 integrated as `3c50c2bb05f68a15c83df4312f7b1877797ce426`. The user confirmed
 GitHub Actions workflow #5 reported success for M2-06; its local backend,
 frontend, PostgreSQL, migration, contract, and Compose evidence is recorded in
-the M2-06 task status. The remaining task breakdown is in
+the M2-06 task status. M2-07 ordered suites are integrated at
+`1e396ddff50893fc4b6bd0db320075f90faf186f`; the user reported GitHub Actions
+workflow #6 succeeded for that SHA. M2-08 found and locally corrected catalog
+integrity and contract defects in an isolated candidate. Milestone 2 remains
+open until that candidate is integrated and all required remote CI jobs pass on
+the final SHA. The remaining task breakdown is in
 [the development plan](development/milestone-2-plan.md).
 
 ### Goal

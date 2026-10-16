@@ -183,6 +183,49 @@ async def test_environment_update_requires_exact_strong_etag(
     assert weak.json()["errors"][0]["pointer"] == "/if-match"
 
 
+async def test_environment_valid_other_resource_etag_is_a_revision_conflict(
+    client: httpx.AsyncClient,
+) -> None:
+    created = await client.post(
+        f"/api/v1/projects/{PROJECT_ID}/environments",
+        json={"name": "Production", "definition": {"base_url": "https://example.com"}},
+    )
+    assert created.status_code == 201
+
+    response = await client.patch(
+        f"/api/v1/environments/{ENVIRONMENT_ID}",
+        headers={"If-Match": f'"test_case:{ENVIRONMENT_ID}:1"'},
+        json={"name": "Changed"},
+    )
+
+    assert response.status_code == 412
+    assert response.json()["code"] == "revision_conflict"
+
+
+async def test_environment_rejects_out_of_range_etag_version(
+    client: httpx.AsyncClient,
+) -> None:
+    created = await client.post(
+        f"/api/v1/projects/{PROJECT_ID}/environments",
+        json={"name": "Production", "definition": {"base_url": "https://example.com"}},
+    )
+    assert created.status_code == 201
+
+    response = await client.patch(
+        f"/api/v1/environments/{ENVIRONMENT_ID}",
+        headers={"If-Match": f'"environment:{ENVIRONMENT_ID}:2147483648"'},
+        json={"name": "Changed"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["errors"][0] == {
+        "location": "header",
+        "pointer": "/if-match",
+        "code": "value_invalid",
+        "message": "Value invalid",
+    }
+
+
 async def test_environment_validation_does_not_echo_secret_canary(
     client: httpx.AsyncClient,
 ) -> None:
@@ -209,6 +252,37 @@ async def test_environment_validation_does_not_echo_secret_canary(
     )
     assert invalid_name.status_code == 422
     assert "canary-secret-name" not in invalid_name.text
+    assert invalid_name.json()["errors"][0]["pointer"] == "/name"
+
+
+@pytest.mark.parametrize(
+    ("patch", "pointer"),
+    [
+        (
+            {"name": None, "definition": {"base_url": "https://v2.example"}},
+            "/name",
+        ),
+        ({"name": "Renamed", "definition": None}, "/definition"),
+    ],
+)
+async def test_environment_patch_rejects_explicit_null_fields(
+    client: httpx.AsyncClient,
+    patch: dict[str, object],
+    pointer: str,
+) -> None:
+    created = await client.post(
+        f"/api/v1/projects/{PROJECT_ID}/environments",
+        json={"name": "Production", "definition": {"base_url": "https://example.com"}},
+    )
+
+    response = await client.patch(
+        f"/api/v1/environments/{ENVIRONMENT_ID}",
+        headers={"If-Match": created.headers["etag"]},
+        json=patch,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["errors"][0]["pointer"] == pointer
 
 
 async def test_environment_openapi_marks_if_match_required(client: httpx.AsyncClient) -> None:

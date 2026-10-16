@@ -29,6 +29,10 @@ class EnvironmentRevisionConflict(EnvironmentError):
     pass
 
 
+class EnvironmentVersionExhausted(EnvironmentError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class SecretReference:
     name: str
@@ -209,6 +213,10 @@ class EnvironmentService:
                 raise EnvironmentNotFound
             if current.state_version != expected_state_version:
                 raise EnvironmentRevisionConflict
+            if current.state_version == 2_147_483_647 or (
+                document is not None and current.active_revision.version == 2_147_483_647
+            ):
+                raise EnvironmentVersionExhausted
             revision = current.active_revision
             changed_fields: list[str] = []
             if canonical_name is not None:
