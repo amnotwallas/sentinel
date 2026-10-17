@@ -56,8 +56,9 @@ overall workflow conclusion; individual backend and Compose job conclusions were
 not separately supplied or recorded. The detailed acceptance mapping is in the
 [Milestone 2 implementation ledger](implementation/milestone-2.md), and the
 planning-only transition is in the
-[Milestone 3 handoff](development/milestone-3-handoff.md). Milestone 3 has not
-started and requires separate implementation authorization.
+[Milestone 3 handoff](development/milestone-3-handoff.md). M3-00 architecture and
+security contracts are frozen; production implementation has not started and
+requires separate authorization.
 
 ### Goal
 
@@ -148,6 +149,15 @@ Create reproducible, immutable inputs for later executions.
 
 ## Milestone 3: Safe execution lifecycle and HTTP adapter
 
+M3-00 is complete at the contract-design level. The repository owner accepted
+[ADR 0008](architecture/ADRs/0008-http-dispatch-outcomes-and-tls-policy.md) and
+the frozen [Milestone 3 implementation contract](implementation/milestone-3.md)
+on 2026-10-17. The approved contract adds `transport_failed` and explicit
+dispatch certainty, resolves DNS only after the durable dispatch checkpoint,
+requires verified TLS 1.2 or newer, disables target proxy inheritance and
+connection pooling, and limits redirect following to safe methods. This status
+does not authorize M3-01, migrations, production changes, or publication.
+
 ### Goal
 
 Execute one test or ordered suite safely, with crash recovery and redacted bounded
@@ -163,8 +173,12 @@ observations, before implementing baseline comparisons.
 - In-memory secret resolution, template expansion, request fingerprinting, and
   fixed/configured redaction.
 - Target-policy adapter with DNS/address validation, redirect-hop validation,
-  TLS verification, timeouts, response streaming/capture limits, and bounded
-  concurrency.
+  DNS-pinned connections, mandatory certificate/hostname verification, additive
+  deployment CA trust, timeouts, response streaming/capture limits, and bounded
+  concurrency. Target requests inherit no proxy and use no library retry.
+- Durable `transport_failed` outcomes and `DispatchCertainty` that distinguish
+  positive `not_sent` proof, possible transmission, and observed responses without
+  weakening conservative crash recovery.
 - Attempt root client span created and IDs checkpointed before dispatch. Full
   Tempo reconciliation waits for Milestone 5.
 - Read endpoints for executions and attempt observations.
@@ -176,6 +190,8 @@ observations, before implementing baseline comparisons.
   different payload returns `409`.
 - Recovery before dispatch continues without an extra request.
 - Recovery from `response_received` evaluates/resumes without resending.
+- Recovery from `transport_failed` never resends, and `not_sent` is recorded only
+  from positive pre-write phase evidence under a live fenced lease.
 - An ambiguous `POST`, `PUT`, `PATCH`, or `DELETE` becomes
   `indeterminate`/`inconclusive` by default.
 - An ambiguous `GET`, `HEAD`, or `OPTIONS` creates a new attempt with new trace and
@@ -185,6 +201,12 @@ observations, before implementing baseline comparisons.
   HTTP retry.
 - DNS rebinding/private-address, cross-origin redirect credentials, TLS, timeout,
   oversized body, invalid secret, and redaction fallback scenarios are safe.
+- A rejected redirect hop receives no TCP/TLS/HTTP connection; its received `3xx`
+  evidence, certainty, rejection code, and redacted Location remain consistent.
+- Selected-IP dialing retains the original HTTP authority and TLS SNI/hostname;
+  hostname mismatch, proxy inheritance, transport retry, and cross-origin
+  connection reuse are rejected by executable local tests.
+- Stored `verify_tls: false` remains readable but fails before DNS/socket activity.
 - Logs, spans, database records, API errors, and test output contain no resolved
   secrets or fixed sensitive headers.
 
@@ -196,6 +218,8 @@ observations, before implementing baseline comparisons.
   result.
 - The implementation makes no exactly-once claim and never auto-retries a
   potentially non-idempotent ambiguous request.
+- The locked HTTP transport passes the DNS-pinning/SNI feasibility gate, and any
+  future transport dependency upgrade must requalify that behavior.
 
 ## Milestone 4: Deterministic evaluation and baseline management
 

@@ -1,6 +1,8 @@
-# Milestone 3 planning handoff
+# Milestone 3 implementation handoff
 
-Status: planning handoff only. Milestone 2 is accepted with status **PASS** at
+Status: M3-00 architecture and security contract **FROZEN** on 2026-10-17;
+production implementation is not authorized. Milestone 2 is accepted with status
+**PASS** at
 `6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715` on `main`. This document does not
 authorize Milestone 3 implementation, a commit, a push, a merge, a migration, or
 a change to an accepted architectural contract.
@@ -21,6 +23,12 @@ not separately supplied.
   0005 governs per-attempt OpenTelemetry identity; ADR 0006 governs secrets,
   redaction, and persistence; ADR 0007 governs dispatch checkpoints, replay, target
   validation, redirects, TLS, timeouts, capture limits, and bounded concurrency.
+  [ADR 0008](../architecture/ADRs/0008-http-dispatch-outcomes-and-tls-policy.md)
+  extends ADR 0007 with the frozen transport-failure, certainty, redirect, TLS,
+  trust, proxy, and DNS-pinning rules.
+- The frozen [Milestone 3 implementation packet](../implementation/milestone-3.md)
+  and [task plan](milestone-3-plan.md) control M3 compatibility surfaces and slice
+  ownership.
 - The [Milestone 2 implementation packet](../implementation/milestone-2.md) and
   planned OpenAPI/fixtures contain reviewed future-interface inputs only. They do
   not make unimplemented M3 routes or schemas part of the runtime contract.
@@ -51,37 +59,50 @@ linked-trace discovery (M5), authoring/results UI (M6), scheduling, notification
 multi-tenancy, billing, AI analysis, Kubernetes, or a dedicated broker. Missing
 telemetry must not alter functional execution outcomes.
 
-## Decisions required before compatibility surfaces
+## Resolved M3-00 contracts
 
-1. Define the durable attempt transition and observation checkpoint for a
-   transport failure that produces no HTTP response. The M2 planning schema
-   identifies this gap; no implementer may silently add or reinterpret an attempt
-   state.
-2. Define and document the operator deployment policy, startup validation, and
-   test matrix governing any explicit `verify_tls: false` definition. TLS
-   verification remains on by default and a stored opt-out is not permission by
-   itself.
-3. Freeze the execution, item, attempt, artifact, idempotency, and job transaction
-   boundaries before allocating migrations or publishing runtime OpenAPI. Queue
-   delivery count, HTTP attempt sequence, and trace-correlation retries remain
-   distinct.
-4. Keep the first-required-baseline bootstrap and baseline-selection timing open
-   for the M4 product/ADR decision. M3 may persist the immutable execution inputs
-   needed later but must not invent baseline semantics.
+1. A known durable transport/redirect failure uses terminal attempt state
+   `transport_failed`. `DispatchCertainty` distinguishes `not_started`, positively
+   proven `not_sent`, `possibly_sent`, and `response_received`.
+2. The `dispatching` checkpoint commits `possibly_sent` before DNS. Only positive
+   controlled pre-write phase evidence under a live fenced lease may record
+   `not_sent`; exceptions, cancellation, lease loss, process death, or uncertain
+   commit do not.
+3. A received `3xx` is an accepted response when redirects are disabled. When an
+   enabled safe-method redirect hop is rejected, the attempt is
+   `transport_failed`/`redirect_denied` with `response_received` certainty, the
+   preceding response is sanitized evidence, and no connection reaches the
+   rejected hop.
+4. HTTPS verification is mandatory with TLS 1.2 or newer. Existing
+   `verify_tls: false` definitions stay readable but fail before DNS/socket I/O.
+   Trust is default roots plus an optional deployment-wide additive CA bundle;
+   proxy inheritance, mTLS, early data, insecure mode, and target pooling are out
+   of MVP scope.
+5. The locked HTTPX/httpcore stack can dial a selected IP while retaining the
+   original authority and SNI/hostname verification through a narrow
+   version-qualified adapter seam. M3-03 must prove the behavior locally before
+   feature code; dependency upgrades require requalification and may not fall
+   back to hostname re-resolution.
+6. Execution, item, attempt, artifact, idempotency, and job transaction boundaries
+   are frozen in the M3 packet. Queue delivery, attempt sequence, redirect hops,
+   and trace retries remain distinct.
+7. First-required-baseline bootstrap and baseline-selection timing remain M4
+   decisions. M3 does not invent baseline semantics.
 
-A material change to an accepted ADR or MVP contract requires the documented ADR
-and product update before implementation.
+A material change to these contracts requires an ADR/product update before
+implementation. Runtime OpenAPI and generated clients are published only with
+implemented slices.
 
-## Proposed delivery sequence
+## Approved delivery sequence
 
 This is a handoff sequence, not implementation authorization. The coordinator
 must turn each approved slice into a task packet with an exact base SHA, branch,
 worktree, owned files, database, ports, interfaces, tests, and publication
 permissions.
 
-1. **M3-00 — Freeze execution contracts and recovery cases.** Resolve the two M3
-   decisions above, enumerate every durable checkpoint and recovery result, close
-   API/problem/idempotency contracts, assign migrations, and name acceptance cases.
+1. **M3-00 — Freeze execution contracts and recovery cases.** Complete. ADR 0008,
+   the M3 packet, named acceptance cases, transaction boundaries, and migration
+   reservations are documented; publication remains separately authorized.
 2. **M3-01 — Atomic execution creation and immutable materialization.** Persist
    executions/items/idempotency records, pin all source revisions in one
    transaction, enqueue atomically, and add POST/list/detail contracts without
@@ -89,9 +110,11 @@ permissions.
 3. **M3-02 — Request preparation and protected observations.** Add template
    expansion, in-memory secret resolution, request fingerprinting, bounded capture,
    and redaction-before-persistence with synthetic canary coverage.
-4. **M3-03 — Safe HTTP adapter.** Enforce DNS/address and redirect-hop validation,
-   credential stripping across origins, TLS policy, timeout/size limits, streaming,
-   and bounded concurrency through explicit ports.
+4. **M3-03 — Safe HTTP adapter.** First pass the locked-stack selected-IP,
+   authority, SNI, hostname, retry/proxy, and connection-isolation feasibility
+   gate; then enforce DNS/address and redirect-hop validation, credential stripping
+   across origins, TLS policy, timeout/size limits, streaming, and bounded
+   concurrency through explicit ports.
 5. **M3-04 — Resumable dispatch and recovery.** Persist `dispatching` before I/O,
    create per-attempt trace/span identity, checkpoint responses, separate job
    redelivery from HTTP replay, and implement conservative ambiguous recovery.
@@ -126,7 +149,9 @@ permissions.
 
 ## Start condition
 
-The next coordinator may prepare the detailed M3-00 contract/task packet from
-this handoff. Production implementation starts only after explicit authorization
-and after the open transport-failure and TLS-policy decisions are resolved or
-assigned as the authorized contract-freeze work.
+The contract decisions required for M3-01 are resolved. The next coordinator may
+prepare an M3-01 task packet from the accepted base only after the M3-00
+documentation candidate is reviewed/published and explicit production
+implementation authorization is supplied. M3-03 has the additional mandatory
+transport feasibility gate. No current authorization permits M3-01, a migration,
+runtime OpenAPI generation, a commit, or a push.

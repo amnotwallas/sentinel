@@ -170,7 +170,7 @@ definition never alters an existing or queued execution.
 | --- | --- | --- |
 | `Execution` | `id`, `project_id`, `environment_revision_id`, `source_type`, `source_revision_id`, `status`, `verdict`, `created_at`, `started_at`, `finished_at` | One requested run. `source_type` is `test_case` or `suite`. Verdict is nullable until terminal. |
 | `ExecutionItem` | `id`, `execution_id`, `ordinal`, `test_case_revision_id`, `status`, `verdict` | Materialized ordered case list. A single-case execution has one item. |
-| `TestAttempt` | `id`, `execution_item_id`, `sequence`, `state`, `request_fingerprint`, `dispatch_recorded_at`, `response_recorded_at`, `duration_ms`, `transport_outcome`, `replayed_by_attempt_id`, `primary_trace_id`, `client_span_id` | One possible network dispatch boundary. A replay always creates a new row and identifiers and links the ambiguous predecessor. Unique `(execution_item_id, sequence)`. |
+| `TestAttempt` | `id`, `execution_item_id`, `sequence`, `state`, `dispatch_certainty`, `request_fingerprint`, `dispatch_recorded_at`, `response_recorded_at`, `duration_ms`, `transport_outcome`, `preparation_error_code`, `redirect_rejection_code`, `replayed_by_attempt_id`, `primary_trace_id`, `client_span_id` | One configured dispatch boundary, including its bounded redirect chain. A replay always creates a new row and identifiers and links the ambiguous predecessor. Unique `(execution_item_id, sequence)`. |
 | `ResponseArtifact` | `id`, `attempt_id`, `status_code`, `headers_json`, `body_kind`, `redacted_body`, `truncated`, `expires_at` | At most one bounded, redacted observation per attempt. Raw secrets and unbounded bodies are forbidden. |
 | `Evaluation` | `id`, `attempt_id`, `kind`, `rule_id`, `severity`, `outcome`, `expected_json`, `actual_json`, `message_code` | One assertion, selector, or performance evaluation. Evidence is redacted and bounded. |
 | `Job` | `id`, `kind`, `subject_id`, `state`, `available_at`, `lease_owner`, `lease_token`, `lease_expires_at`, `delivery_count`, `max_deliveries`, `last_error_code`, `created_at`, `finished_at` | Durable work item. `subject_id` identifies an execution or trace reconciliation target. Payloads carry IDs, not secret-bearing request documents. |
@@ -179,6 +179,13 @@ definition never alters an existing or queued execution.
 `TestAttempt` is intentionally conservative: after `dispatching` is committed,
 Sentinel treats the request as possibly sent even if the process died before the
 socket write. This avoids silently duplicating non-idempotent effects.
+
+`dispatch_certainty` is `not_started`, `not_sent`, `possibly_sent`, or
+`response_received`. The checkpoint writes `possibly_sent`; only positive
+pre-write phase proof under a live fenced lease can later record `not_sent`.
+Certainty is attempt-wide across a redirect chain: `not_sent` proves no hop wrote
+HTTP bytes, while a later unresolved write is `possibly_sent` even if an earlier
+hop returned `3xx`.
 
 ### 5.3 Baseline and trace entities
 
@@ -259,21 +266,27 @@ ExecutionItem: pending -> running -> completed
 ### 6.3 Attempt state
 
 ```text
-prepared -> dispatching -> response_received -> evaluated
-    |            |               |
-    |            |               +-> failed (evaluation cannot be recovered)
-    |            +-> replay_scheduled (ambiguous and replay permitted)
-    |            +-> indeterminate (ambiguous and replay forbidden)
-    +-> failed (request preparation or policy rejection)
+prepared
+  |-- failed (request preparation or static policy rejection)
+  `-- dispatching
+        |-- response_received --> evaluated
+        |                         `-- failed (evaluation cannot be recovered)
+        |-- transport_failed
+        |-- replay_scheduled --> new prepared attempt
+        `-- indeterminate
 ```
 
 The transaction entering `dispatching` also persists the request fingerprint,
-trace ID, and client span ID. Network I/O starts only after commit. Recovery of
-`response_received` resumes evaluation without resending. Recovery of
-`dispatching` consults replay policy; a replayable case marks the old attempt
-`replay_scheduled`, creates a new linked `prepared` attempt, and excludes the old
-attempt from verdict aggregation after the successor evaluates. A non-replayable
-case becomes terminal `indeterminate` and drives an inconclusive verdict.
+trace ID, client span ID, and `possibly_sent` certainty. DNS and all destination
+network I/O start only after commit. `transport_failed` is a durable terminal
+transport or redirect-policy outcome without an accepted final response; it is
+never recovered by resending. Recovery of `response_received` resumes evaluation
+without resending. Recovery of `dispatching` consults replay policy; a replayable
+case marks the old attempt `replay_scheduled`, creates a new linked `prepared`
+attempt, and excludes the old attempt from verdict aggregation after the successor
+evaluates. A non-replayable case becomes terminal `indeterminate` and drives an
+inconclusive verdict. ADR 0008 defines the exact certainty proofs and outcome
+matrix.
 
 ### 6.4 Trace-correlation state
 
@@ -315,22 +328,27 @@ None of these states changes an execution verdict.
    assigns its worker ID, sets its lease deadline, and increments delivery count.
 2. The handler locks the execution, observes its durable state, and performs only
    the next unfinished transition. Re-delivery of completed work is a no-op.
-3. It resolves non-secret variables and secret references in memory, validates
-   the final destination after DNS resolution, applies limits, and creates a
-   canonical request fingerprint that excludes resolved secret values.
+3. It resolves non-secret variables and secret references in memory, performs
+   static URL/scheme/userinfo/port and TLS-policy checks, applies limits, and
+   creates a canonical request fingerprint that excludes resolved secret values.
 4. It allocates an attempt ID, primary trace ID, and client span ID.
 
 ### 7.3 Dispatch checkpoint and HTTP call
 
-1. A short transaction records the attempt as `dispatching` with correlation
-   identifiers. It commits before any socket operation.
-2. The HTTP adapter creates the recorded OpenTelemetry client span, injects W3C
-   context and Sentinel correlation baggage, and sends one bounded request.
+1. A short fenced transaction records the attempt as `dispatching` with
+   correlation identifiers and `possibly_sent` certainty. It commits before DNS
+   or any destination socket operation.
+2. The HTTP adapter resolves and validates every address, chooses a permitted
+   address, connects only to that address while retaining original-host HTTP
+   authority and TLS SNI/hostname verification, creates the recorded OpenTelemetry
+   client span, injects W3C context and Sentinel correlation baggage, and sends
+   one bounded configured request and any permitted redirect hops.
 3. The worker heartbeats the job lease independently of the HTTP timeout.
 4. The response or transport outcome is converted to a bounded in-memory
    observation. Secret-bearing fields are redacted before logging or persistence.
-5. A transaction writes the response artifact and changes the attempt to
-   `response_received`.
+5. A fenced transaction either writes the accepted final response artifact and
+   changes the attempt to `response_received`, or records the sanitized outcome
+   and changes it to `transport_failed`. A stale worker writes neither.
 
 ### 7.4 Evaluation and classification
 
@@ -538,10 +556,14 @@ they are not retroactively returned by the asynchronous creation request.
 | Worker dies before `dispatching` commit | Attempt is absent or `prepared` | Reclaimed job may continue; no request is considered sent | Execution resumes |
 | Worker dies after `dispatching` commit | Attempt remains ambiguous | Replay only if policy permits, always as a new attempt | `inconclusive` when replay is forbidden |
 | Worker dies after response checkpoint | Response remains redacted and durable | Resume evaluation without another HTTP call | Execution resumes |
+| Worker dies after observing a response but before its fenced checkpoint | Durable attempt remains `dispatching`/`possibly_sent`; in-memory evidence is discarded | Apply ambiguous recovery; stale worker cannot write | May replay only under accepted policy or become `inconclusive` |
 | Lease heartbeat temporarily fails | Handler stops new side effects when lease ownership cannot be confirmed | Another worker reclaims after expiration | Possible delay, never assumed ownership |
 | Job exceeds delivery limit | Job becomes `dead` | No automatic retry | Execution `failed`; usually `not_evaluated` |
-| DNS/TLS/connect/read timeout | Redacted transport outcome | No same-attempt retry; execution policy decides only explicit replay | `inconclusive`, not guessed root cause |
+| DNS/TLS/connect failure before request write | `transport_failed` with positive `not_sent` proof | No automatic retry | Explicit safe outcome; ordinarily `inconclusive` |
+| Write/read/total timeout or connection loss after transmission may begin | `transport_failed` with `possibly_sent`, or `response_received` certainty after a response head | No automatic retry | `inconclusive`, not guessed root cause |
 | Response exceeds capture limit | Artifact marked truncated | No refetch | Evaluate available metadata; content-dependent checks are inconclusive |
+| `3xx` while redirects are disabled | Accepted final response | No redirect | Status is ordinary response evidence |
+| Proposed redirect hop is rejected | Received `3xx` is sanitized evidence; attempt is `transport_failed`/`redirect_denied` with `response_received` certainty | No connection to rejected hop | Explicit redirect policy outcome |
 | Invalid JSON for JSON check | Parse evaluation failure | No retry | Required JSON rule fails with deterministic evidence |
 | Missing secret reference | Preparation failure before dispatch | No HTTP call; fix configuration and start a new run | Execution item failed/not evaluated |
 | Target denied by network policy | Preparation/redirect failure | No HTTP call to denied address | Explicit policy error |
@@ -577,8 +599,23 @@ entire body is omitted from persistence and marked `redaction_unavailable`.
 The HTTP adapter resolves and validates every destination and redirect hop. It
 blocks dangerous address classes by default and allows explicit operator
 hostname/CIDR exceptions for intentional local testing. The connection must be
-made to a validated resolution, with DNS rebinding defenses appropriate to the
-HTTP library. Redirects are opt-in and bounded. See ADR 0007.
+made to a selected validated address without a second hostname resolution. HTTP
+authority, TLS SNI, and certificate hostname verification retain the canonical
+original hostname. DNS occurs only after the durable `dispatching` checkpoint.
+
+HTTPS requires certificate-chain and hostname verification with TLS 1.2 or
+newer. Default trust roots may be extended by one deployment-wide PEM CA bundle;
+insecure verification, per-environment trust, mTLS, and TLS early data are outside
+the MVP. A stored `verify_tls: false` definition fails before DNS or socket I/O
+with `tls_verification_required` and is never silently coerced.
+
+Target clients inherit no proxy settings, perform no library retry, and use no
+connection pooling in the MVP. Redirects are opt-in, bounded, and followed only
+for `GET`, `HEAD`, and `OPTIONS`. Every proposed hop is validated before
+connection. Cross-origin hops remove fixed credentials and every secret-derived
+header. A rejected hop receives no TCP/TLS/HTTP connection; the preceding `3xx`
+is retained only as bounded sanitized evidence with its Location value redacted.
+See ADRs 0007 and 0008.
 
 ### 12.4 Retention
 
@@ -701,3 +738,4 @@ boundary and operator configuration remain part of the security model.
 - [ADR 0005: OpenTelemetry trace correlation](ADRs/0005-opentelemetry-trace-correlation.md)
 - [ADR 0006: Secret handling, redaction, and retention](ADRs/0006-security-privacy-retention.md)
 - [ADR 0007: Conservative outbound execution safety](ADRs/0007-outbound-execution-safety.md)
+- [ADR 0008: HTTP dispatch outcomes and TLS policy](ADRs/0008-http-dispatch-outcomes-and-tls-policy.md)

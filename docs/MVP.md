@@ -63,8 +63,11 @@ Sentinel reports evidence. It does not infer or claim root cause.
   placed in URLs or query parameters because they are routinely exposed by
   infrastructure logs.
 - Configurable connect/read/total timeout within deployment limits.
-- Redirect following disabled by default and bounded when explicitly enabled.
-- TLS certificate verification enabled by default.
+- Redirect following disabled by default and bounded when explicitly enabled;
+  only `GET`, `HEAD`, and `OPTIONS` may follow in the MVP.
+- HTTPS certificate-chain and hostname verification are mandatory. Existing
+  definitions with `verify_tls: false` remain readable but are rejected before
+  DNS or socket activity.
 - A maximum captured response size; larger responses are truncated for storage
   and marked unevaluable for comparisons that need truncated content.
 
@@ -178,8 +181,12 @@ idempotent, but outbound HTTP effects cannot be made exactly once.
 
 Before network I/O, the worker persists an attempt in `dispatching`, including
 its request fingerprint, trace ID, and client span ID. The commit intentionally
-precedes sending. If the worker later recovers an attempt still in `dispatching`,
-Sentinel cannot distinguish “not sent” from “sent but response not recorded.”
+precedes DNS resolution and sending and records dispatch certainty as
+`possibly_sent`. If the worker later recovers an attempt still in `dispatching`,
+Sentinel cannot distinguish “not sent” from “sent but response not recorded.” A
+live fenced worker may record `not_sent` only from positive pre-write phase proof;
+an ambiguous exception, cancellation, lost lease, process death, or uncertain
+database commit never downgrades `possibly_sent`.
 
 - `GET`, `HEAD`, and `OPTIONS` are replayable by default.
 - Other methods are not replayed unless the test revision explicitly sets
@@ -192,6 +199,13 @@ Sentinel cannot distinguish “not sent” from “sent but response not recorde
   available.
 - Queue retries recover orchestration failures; they do not themselves authorize
   an HTTP replay.
+- A known DNS, connection, TLS, write, read, timeout, or redirect failure becomes
+  a durable `transport_failed` attempt and is not automatically resent. HTTP
+  `4xx` and `5xx` statuses are responses, not transport failures.
+- A received `3xx` is the final response when redirect following is disabled. If
+  following is enabled and a proposed safe-method hop is rejected, the received
+  `3xx` remains sanitized evidence, the attempt becomes `transport_failed` with
+  `response_received` certainty, and no connection is made to the rejected hop.
 
 Job leases, expiration, retry limits, and failure transitions are specified in
 `docs/architecture/ADRs/0002-postgresql-job-queue.md`.
@@ -285,7 +299,8 @@ tests or the documented Docker Compose acceptance run.
 - Starting an execution returns `202` before its HTTP request completes.
 - A worker claims a runnable job exclusively while another worker skips it.
 - A suite executes its cases in stored order and records a distinct attempt for
-  every outbound request.
+  every configured case dispatch or recovery replay. A bounded redirect chain is
+  part of that configured attempt and is not a replay.
 - Timeouts, DNS/TLS failures, oversized responses, invalid JSON, and target-policy
   rejection produce explicit, redacted outcomes rather than worker crashes.
 
@@ -303,6 +318,8 @@ tests or the documented Docker Compose acceptance run.
 - Recovery of an ambiguous default-replayable request creates a new attempt and
   distinct trace identifiers.
 - Tests demonstrate that lease recovery and HTTP replay policy are independent.
+- Recovery from a durable `response_received` or `transport_failed` state does
+  not send another target request.
 
 ### Regression and baselines
 
@@ -339,6 +356,12 @@ tests or the documented Docker Compose acceptance run.
 - Sensitive JSON paths configured by the operator are redacted before storage.
 - Target validation rejects blocked address classes after DNS resolution and on
   every redirect hop.
+- The socket connects only to a validated resolved address while HTTP authority,
+  TLS SNI, and certificate hostname verification retain the original hostname.
+- Rejected redirect hops receive no target connection. Cross-origin redirects
+  remove fixed credentials and every secret-derived header.
+- Target HTTP clients inherit no proxy configuration and perform no library-level
+  retry.
 - Response capture limits and concurrency limits are enforced.
 - Cleanup removes expired artifacts and execution metadata according to policy
   while preserving active baseline values and definition history.
@@ -348,11 +371,18 @@ tests or the documented Docker Compose acceptance run.
 - API/frontend bind: `127.0.0.1` only.
 - Non-loopback API binding: requires an operator-supplied bearer token from an
   environment variable; Sentinel does not store the token.
-- TLS verification: enabled.
+- TLS certificate-chain and hostname verification: required for HTTPS; minimum
+  TLS 1.2, with no insecure opt-out, TLS early data, or client certificate in the
+  MVP.
+- Target trust: default roots plus one optional deployment-wide additive PEM CA
+  bundle selected by `SENTINEL_TARGET_CA_BUNDLE` and validated by the worker at
+  startup.
+- Target proxy inheritance and target connection pooling: disabled.
 - Redirects: disabled.
 - Private, loopback, link-local, multicast, unspecified, and cloud-metadata
   targets: denied unless an exact hostname or CIDR is operator-allowlisted.
 - Maximum redirects when enabled: 3, with target validation at every hop.
+- Redirect methods when enabled: `GET`, `HEAD`, and `OPTIONS` only.
 - Default total request timeout: 30 seconds; deployment maximum: 120 seconds.
 - Default stored response-body limit: 256 KiB; deployment maximum: 1 MiB.
 - Default worker HTTP concurrency: 4; configurable from 1 through 32.
@@ -372,6 +402,11 @@ stored separately so ordinary artifact expiration remains safe.
 - Target APIs fit bounded request/response semantics; streaming is unsupported.
 - API effects cannot be exactly once. The conservative crash window may classify
   a request as indeterminate even when it was never sent.
+- Corporate outbound proxies, mTLS-only targets, per-environment CA stores, and
+  insecure TLS endpoints are unsupported in the MVP.
+- The locked HTTP transport uses a version-qualified adapter seam to dial a
+  validated IP while preserving original-host authority, SNI, and hostname
+  verification. Transport dependency upgrades require requalification.
 - PostgreSQL polling is adequate for the MVP's low throughput but is not a
   general-purpose message broker.
 - Tempo search capabilities and attribute indexing vary. Direct trace-ID lookup
