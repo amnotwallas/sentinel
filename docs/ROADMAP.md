@@ -40,25 +40,24 @@ PostgreSQL named-volume persistence across restart/replacement. The implementati
 was committed and pushed to `amnotwallas/sentinel` on `main` as
 `62635ea71566dc8e21118667a393ed944f6a0cce`. The user confirmed all GitHub Actions
 backend, frontend, and Compose jobs passed. The run URL/logs were not independently
-captured in this checkout; this CI status is user-reported. Milestone 2 is in
-progress. M2-00 through M2-07 are integrated on `main`; M2-03 is commit
-`fc9c3aa46838fa2b6f754f8973990d5480b8bede`. The user confirmed GitHub Actions
-run #3 completed successfully in 1 minute 18 seconds, including a frontend Vitest
-summary of 2 passing files and 4 passing tests. The run URL and individual backend
-and Compose job details have not been independently captured. M2-04 typed-client
-coverage is integrated as `7783038965a007c9b80234565be467faaca49afb`, M2-05
-definition validation is integrated as
-`46083d7e84bbb224e4f8de7f0f41c9844e86fc31`, and M2-06 immutable test cases are
-integrated as `3c50c2bb05f68a15c83df4312f7b1877797ce426`. The user confirmed
-GitHub Actions workflow #5 reported success for M2-06; its local backend,
-frontend, PostgreSQL, migration, contract, and Compose evidence is recorded in
-the M2-06 task status. M2-07 ordered suites are integrated at
-`1e396ddff50893fc4b6bd0db320075f90faf186f`; the user reported GitHub Actions
-workflow #6 succeeded for that SHA. M2-08 found and locally corrected catalog
-integrity and contract defects in an isolated candidate. Milestone 2 remains
-open until that candidate is integrated and all required remote CI jobs pass on
-the final SHA. The remaining task breakdown is in
-[the development plan](development/milestone-2-plan.md).
+captured in this checkout; this CI status is user-reported.
+
+Milestone 2 is complete with status **PASS**. The accepted implementation is
+`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715` on `main`. The independent M2-08
+review passed locally with 235 backend tests, including the real-PostgreSQL
+integration suite, plus migration round trips, contract validation, security
+checks, nine frontend tests, and full Compose verification. The repository owner
+supplied the final remote evidence: the `checks` push workflow on `main` concluded
+`success` in 1 minute 28 seconds at
+[GitHub Actions run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329),
+with frontend Vitest reporting 2 files and 9 tests passed. This supplied evidence
+was accepted without independently retrieving GitHub Actions. It establishes the
+overall workflow conclusion; individual backend and Compose job conclusions were
+not separately supplied or recorded. The detailed acceptance mapping is in the
+[Milestone 2 implementation ledger](implementation/milestone-2.md), and the
+planning-only transition is in the
+[Milestone 3 handoff](development/milestone-3-handoff.md). Milestone 3 has not
+started and requires separate implementation authorization.
 
 ### Goal
 

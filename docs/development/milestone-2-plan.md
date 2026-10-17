@@ -1,11 +1,16 @@
 # Milestone 2 task plan
 
-Milestone 2 implementation is in final acceptance. M2-00 through M2-07 are
-integrated on `main` at `1e396ddff50893fc4b6bd0db320075f90faf186f`; the user
-reported GitHub Actions workflow #6 succeeded for that SHA. M2-08 local review
-and correction are complete in an isolated candidate, but milestone acceptance
-remains pending integration and remote CI on the final SHA. Scope and exit
-criteria come from
+Milestone 2 is complete with status **PASS**. M2-00 through M2-08 are integrated
+on `main` at the accepted implementation SHA
+`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. The independent M2-08 review and
+corrections passed the complete local acceptance gate. The repository owner
+supplied final remote CI evidence for the exact SHA: the `checks` workflow,
+triggered by a push to `main`, concluded `success` in 1 minute 28 seconds at
+[run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329).
+Frontend Vitest reported 2 files and 9 tests passed. The workflow evidence was
+not independently retrieved; no individual backend or Compose job conclusion was
+separately supplied, so this plan records only the overall successful workflow
+and the explicit frontend test detail. Scope and exit criteria come from
 [ROADMAP.md](../ROADMAP.md#milestone-2-versioned-catalog-and-definition-api),
 with endpoint inventory in [MVP.md](../MVP.md#api-acceptance-contract). The accepted
 [architecture](../architecture/README.md) and ADRs remain unchanged. Milestone 1
@@ -92,9 +97,8 @@ writes client-consumption tests/source, not generated artifacts.
   future catalog foreign keys without deleting another worktree's data.
 - **Tests:** Real PostgreSQL readiness against migrated schema, missing/version
   mismatch cases, existing health/queue/worker suite and Compose startup.
-- **Status:** Supported-head readiness is implemented and verified. Catalog
-  FK-safe fixture cleanup remains pending until M2-02 introduces those tables;
-  the coordinator applies that change with the actual schema, not in advance.
+- **Status:** Supported-head readiness and catalog FK-safe fixture cleanup are
+  implemented and verified on the accepted Milestone 2 candidate.
 - **Parallel:** May overlap M2-02's exclusively owned files. Shared wiring and
   database integration wait for this prerequisite. No generic 'any revision is OK' shortcut.
 
@@ -164,7 +168,8 @@ writes client-consumption tests/source, not generated artifacts.
   `7783038965a007c9b80234565be467faaca49afb`, with local runtime acceptance
   coverage for typed project/environment reads, pagination, ETag/Location access,
   If-Match transmission, stale-update problem responses, frontend quality gates,
-  and generated-contract drift. Remote CI verification remains pending.
+  and generated-contract drift. Final integrated-candidate CI acceptance is
+  recorded at the top of this plan.
 
 ### M2-05 — Validate a test definition and return safe boundary errors
 
@@ -193,8 +198,8 @@ writes client-consumption tests/source, not generated artifacts.
   `46083d7e84bbb224e4f8de7f0f41c9844e86fc31`, with strict canonical validation,
   separated security/regression ownership, stable fixture fingerprints,
   security-focused unit coverage, and 39 passing PostgreSQL integration tests.
-  Acceptance remains open until backend, frontend, and Compose remote CI pass on
-  the resulting `main` SHA. Persistence use by M2-06 remains future work.
+  Persistence use landed in M2-06, and final integrated-candidate acceptance is
+  complete.
 
 ### M2-06 — Immutable test-case API and revision history
 
@@ -242,10 +247,15 @@ is user-reported.
 
 ### M2-08 — Independent acceptance/security review and milestone integration
 
-Status: local acceptance candidate complete. Full backend, PostgreSQL,
-frontend, contract, migration, packaging, and Compose gates pass after focused
-corrections. Final acceptance remains pending authorized integration and all
-required remote CI jobs on the resulting SHA.
+Status: **PASS**. The reviewed corrections are integrated on `main` at
+`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. Full backend, PostgreSQL,
+frontend, contract, migration, packaging, security, and Compose gates passed
+locally. The repository owner supplied an overall successful `checks` workflow
+for that exact SHA at
+[run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329).
+Only the frontend Vitest detail—2 files and 9 tests passed—was explicitly
+supplied at job level; backend and Compose job conclusions were not separately
+reported.
 
 - **Objective:** Verify the complete API definition journey and all M2 exit criteria.
 - **Owned files:** QA's proposed `tests/integration/test_catalog_acceptance.py` and

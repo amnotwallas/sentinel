@@ -1,6 +1,6 @@
 # Milestone 2 wire contracts and integration packet
 
-Status: M2-00 through M2-07 are integrated; the M2-08 local acceptance candidate is complete and pending authorized integration and remote CI. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual catalog persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This document is not authorization to begin an unapproved feature.
+Status: **PASS**. M2-00 through M2-08 are integrated on `main` at accepted implementation SHA `6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. Prepared from [AGENTS.md](../../AGENTS.md), [MVP](../MVP.md), [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs 0001–0007, the actual catalog persistence, and the [task plan](../development/milestone-2-plan.md). The coordinator owns this contract. Changes to these wire choices require an explicit contract handoff; material architecture changes require an ADR. This acceptance does not authorize Milestone 3 implementation.
 
 ## Implementation ledger
 
@@ -17,16 +17,41 @@ suites are integrated on `main` at
 `1e396ddff50893fc4b6bd0db320075f90faf186f`; the user reported GitHub Actions
 workflow #6 succeeded for that SHA.
 
-M2-08 independently reviewed the combined catalog and locally corrected five
+M2-08 independently reviewed the combined catalog and corrected five
 confirmed findings: environment active-revision ownership, environment version
 exhaustion, environment ETag edge semantics, project/environment runtime OpenAPI
-fidelity, and environment null/error-pointer boundary behavior. The isolated
-candidate passes 176 non-integration backend tests, 59 real-PostgreSQL tests
+fidelity, and environment null/error-pointer boundary behavior. The accepted
+candidate passed 176 non-integration backend tests, 59 real-PostgreSQL tests
 (235 total), 9 frontend tests, exact runtime/planned contract checks, Alembic
 upgrade/downgrade/drift and data-preservation checks, wheel resource inspection,
-and full Compose API/worker/frontend/Tempo-outage acceptance. These are local
-results only. Milestone 2 remains open until this candidate is integrated and
-all required GitHub Actions jobs pass on the exact final SHA.
+security checks, and full Compose API/worker/frontend/Tempo-outage acceptance.
+
+The repository owner supplied final remote CI evidence for the exact accepted
+SHA: branch `main`, trigger `push`, overall workflow conclusion `success`, duration
+1 minute 28 seconds, and
+[GitHub Actions run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329).
+The supplied frontend Vitest detail is 2 files and 9 tests passed. Per release
+instruction, this evidence was not independently retrieved. The repository's
+`checks` workflow defines backend, frontend, and Compose jobs, but individual
+backend and Compose job conclusions were not separately supplied. Acceptance
+therefore records the owner-supplied successful workflow as aggregate remote CI
+evidence and does not fabricate job-level results.
+
+### Final acceptance decision
+
+| Milestone 2 criterion | Accepted evidence | Status |
+| --- | --- | --- |
+| Definition workflows are durable through the API with change history | Integrated project, environment, test-case revision, and ordered-suite routes; complete local catalog journey and PostgreSQL acceptance | PASS |
+| Future execution can pin immutable inputs without reading mutable documents | Immutable environment/test/suite revisions, exact ordered suite pins, ownership constraints, history and concurrency coverage | PASS |
+| No outbound target request is sent in M2 | Contract/security review and target-I/O, DNS, and secret-resolution boundary checks; no M3 route registered | PASS |
+| Persistence and migrations are reviewable and reversible | 59 real-PostgreSQL tests plus Alembic upgrade/downgrade/drift and data-preservation checks on the accepted candidate | PASS |
+| Runtime OpenAPI and generated frontend client remain aligned | Exact runtime/planned contract checks and 9 frontend tests locally; supplied remote frontend Vitest result of 2 files and 9 tests passed | PASS |
+| Secret references, error surfaces, logs, spans, and stored evidence remain safe | Independent M2-08 security review and synthetic-canary coverage completed without an unresolved finding | PASS |
+| Integrated runtime and remote gate succeed on the accepted SHA | Full local Compose verification plus owner-supplied successful push workflow for `6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715` | PASS |
+
+Milestone 2 is accepted. The planning-only transition is recorded in the
+[Milestone 3 handoff](../development/milestone-3-handoff.md); implementation still
+requires separate authorization.
 
 ## 1. Scope and decision provenance
 
@@ -446,6 +471,8 @@ The supported source checkout and Docker image ship these assets together; a
 standalone wheel without them fails closed and is not a supported deployment.
 
 M2-01 catalog fixture cleanup now covers every integrated catalog foreign key.
-M2-02 through M2-07 are integrated with active OpenAPI generation and typed client
-consumption. M2-08 remains governed by the worktree handoff and final-CI rule in
-[workflow](../development/workflow.md#starting-parallel-work).
+M2-02 through M2-08 are integrated with active OpenAPI generation and typed
+client consumption. Final acceptance identity and CI evidence are recorded in
+the implementation ledger above. Future work follows the authorization,
+ownership, isolation, and final-CI rules in the
+[workflow](../development/workflow.md).
