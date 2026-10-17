@@ -17,6 +17,41 @@ export interface paths {
         patch: operations["update_environment"];
         trace?: never;
     };
+    "/api/v1/executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Executions */
+        get: operations["list_executions"];
+        put?: never;
+        /** Create Execution */
+        post: operations["create_execution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/executions/{execution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Execution */
+        get: operations["get_execution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -198,6 +233,37 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Assertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["HeaderPresentAssertion"] | components["schemas"]["HeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
+        /**
+         * AttemptState
+         * @enum {string}
+         */
+        AttemptState: "prepared" | "dispatching" | "response_received" | "transport_failed" | "evaluated" | "replay_scheduled" | "indeterminate" | "failed";
+        /** AttemptSummary */
+        AttemptSummary: {
+            /** Client Span Id */
+            client_span_id?: string | null;
+            created_at: components["schemas"]["Timestamp"];
+            dispatch_certainty: components["schemas"]["DispatchCertainty"];
+            dispatch_recorded_at: components["schemas"]["Timestamp"] | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            finished_at: components["schemas"]["Timestamp"] | null;
+            id: components["schemas"]["UUID"];
+            /** Included In Verdict */
+            included_in_verdict: boolean;
+            links: components["schemas"]["RelativeLinks"];
+            preparation_error_code: components["schemas"]["PreparationErrorCode"] | null;
+            /** Primary Trace Id */
+            primary_trace_id?: string | null;
+            redirect_rejection_code: components["schemas"]["RedirectRejectionCode"] | null;
+            replayed_by_attempt_id: components["schemas"]["UUID"] | null;
+            response_recorded_at: components["schemas"]["Timestamp"] | null;
+            /** Sequence */
+            sequence: number;
+            state: components["schemas"]["AttemptState"];
+            transport_outcome: components["schemas"]["TransportOutcome"] | null;
+            verdict: components["schemas"]["Verdict"] | null;
+        };
         CIDR: string;
         CanonicalAssertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["CanonicalHeaderPresentAssertion"] | components["schemas"]["CanonicalHeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
         CanonicalComparisonPolicy: {
@@ -331,6 +397,31 @@ export interface components {
              */
             schema_version: 1;
         };
+        /** ChangeEventOutput */
+        ChangeEventOutput: {
+            after_ref: components["schemas"]["UUID"] | null;
+            before_ref: components["schemas"]["UUID"] | null;
+            created_at: components["schemas"]["Timestamp"];
+            id: components["schemas"]["UUID"];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "environment_created" | "environment_updated" | "test_case_created" | "test_case_revised" | "suite_created" | "suite_revised" | "baseline_activated";
+            project_id: components["schemas"]["UUID"];
+            subject_id: components["schemas"]["UUID"];
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "environment" | "test_case" | "suite" | "baseline";
+            summary: components["schemas"]["ChangeEventSummary"];
+        };
+        /** ChangeEventSummary */
+        ChangeEventSummary: {
+            /** Changed Fields */
+            changed_fields: ("name" | "base_url" | "variables" | "secret_references" | "target_policy" | "request" | "assertions" | "comparison_policy" | "redaction" | "allow_unsafe_replay" | "suite_items" | "baseline_activation")[];
+        };
         ComparisonPolicy: {
             /** @default false */
             exact_text_body?: boolean;
@@ -350,6 +441,11 @@ export interface components {
         Cursor: string;
         /** @description Finite original decimal token <=38 significant digits, adjusted exponent -128..128; canonical plain decimal/negative zero0; no binary float decision. */
         DecimalNumber: number;
+        /**
+         * DispatchCertainty
+         * @enum {string}
+         */
+        DispatchCertainty: "not_started" | "not_sent" | "possibly_sent" | "response_received";
         EnvironmentCreate: {
             definition: components["schemas"]["EnvironmentDocument"];
             name: components["schemas"]["Name"];
@@ -418,6 +514,102 @@ export interface components {
             project_id: components["schemas"]["UUID"];
             updated_at: components["schemas"]["Timestamp"];
         };
+        /** ExecutionCreate */
+        ExecutionCreate: components["schemas"]["ExecutionCreateTestCase"] | components["schemas"]["ExecutionCreateSuite"];
+        ExecutionCreateSuite: {
+            environment_id: components["schemas"]["UUID"];
+            suite_id: components["schemas"]["UUID"];
+        };
+        ExecutionCreateTestCase: {
+            environment_id: components["schemas"]["UUID"];
+            test_case_id: components["schemas"]["UUID"];
+        };
+        /** ExecutionDetail */
+        ExecutionDetail: {
+            /** Change Evidence */
+            change_evidence: components["schemas"]["ChangeEventOutput"][];
+            /** Change Evidence Truncated */
+            change_evidence_truncated: boolean;
+            /** Completed Item Count */
+            completed_item_count: number;
+            created_at: components["schemas"]["Timestamp"];
+            environment_id: components["schemas"]["UUID"];
+            environment_revision_id: components["schemas"]["UUID"];
+            finished_at: components["schemas"]["Timestamp"] | null;
+            id: components["schemas"]["UUID"];
+            /** Item Count */
+            item_count: number;
+            /** Items */
+            items: components["schemas"]["ExecutionItem"][];
+            links: components["schemas"]["RelativeLinks"];
+            project_id: components["schemas"]["UUID"];
+            source_id: components["schemas"]["UUID"];
+            source_revision_id: components["schemas"]["UUID"];
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "test_case" | "suite";
+            started_at: components["schemas"]["Timestamp"] | null;
+            status: components["schemas"]["ExecutionStatus"];
+            verdict: components["schemas"]["Verdict"] | null;
+        };
+        /** ExecutionItem */
+        ExecutionItem: {
+            /** Attempt Count */
+            attempt_count: number;
+            /** Attempts */
+            attempts: components["schemas"]["AttemptSummary"][];
+            /** Attempts Truncated */
+            attempts_truncated: boolean;
+            finished_at: components["schemas"]["Timestamp"] | null;
+            id: components["schemas"]["UUID"];
+            /** Ordinal */
+            ordinal: number;
+            started_at: components["schemas"]["Timestamp"] | null;
+            status: components["schemas"]["ItemStatus"];
+            test_case_id: components["schemas"]["UUID"];
+            test_case_revision_id: components["schemas"]["UUID"];
+            /** Test Case Revision Version */
+            test_case_revision_version: number;
+            verdict: components["schemas"]["Verdict"] | null;
+        };
+        /** ExecutionPage */
+        ExecutionPage: {
+            /** Items */
+            items: components["schemas"]["ExecutionSummary"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
+         * ExecutionStatus
+         * @enum {string}
+         */
+        ExecutionStatus: "queued" | "running" | "completed" | "failed";
+        /** ExecutionSummary */
+        ExecutionSummary: {
+            /** Completed Item Count */
+            completed_item_count: number;
+            created_at: components["schemas"]["Timestamp"];
+            environment_id: components["schemas"]["UUID"];
+            environment_revision_id: components["schemas"]["UUID"];
+            finished_at: components["schemas"]["Timestamp"] | null;
+            id: components["schemas"]["UUID"];
+            /** Item Count */
+            item_count: number;
+            links: components["schemas"]["RelativeLinks"];
+            project_id: components["schemas"]["UUID"];
+            source_id: components["schemas"]["UUID"];
+            source_revision_id: components["schemas"]["UUID"];
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "test_case" | "suite";
+            started_at: components["schemas"]["Timestamp"] | null;
+            status: components["schemas"]["ExecutionStatus"];
+            verdict: components["schemas"]["Verdict"] | null;
+        };
         /** FieldError */
         FieldError: {
             /**
@@ -459,6 +651,11 @@ export interface components {
         };
         /** @description Exact lowercase IDNA; no wildcard/port/template/trailing dot; IP uses CIDR. */
         Hostname: string;
+        /**
+         * ItemStatus
+         * @enum {string}
+         */
+        ItemStatus: "pending" | "running" | "completed" | "indeterminate" | "failed" | "skipped";
         JSONAbsentAssertion: {
             id: components["schemas"]["UUID"];
             /**
@@ -549,6 +746,11 @@ export interface components {
         };
         /** @description Validate named versioned policy in M2 only. Invalid runtime input yields explicit error;M4 verdict mapping unresolved. */
         Normalizer: components["schemas"]["NoneNormalizer"] | components["schemas"]["SortScalarArrayNormalizer"] | components["schemas"]["RoundDecimalNormalizer"];
+        /**
+         * PreparationErrorCode
+         * @enum {string}
+         */
+        PreparationErrorCode: "secret_missing" | "template_variable_missing" | "target_policy_denied" | "request_invalid" | "tls_verification_required" | "infrastructure_failure";
         /** Problem */
         Problem: {
             /**
@@ -748,6 +950,16 @@ export interface components {
              * @constant
              */
             schema_version?: 1;
+        };
+        /**
+         * RedirectRejectionCode
+         * @enum {string}
+         */
+        RedirectRejectionCode: "method_not_allowed" | "location_missing" | "location_invalid" | "scheme_denied" | "port_denied" | "target_denied" | "redirect_limit_exceeded";
+        /** RelativeLinks */
+        RelativeLinks: {
+            /** Self */
+            self: string;
         };
         Request: {
             /** @default null */
@@ -974,9 +1186,19 @@ export interface components {
         };
         /** Format: date-time */
         Timestamp: string;
+        /**
+         * TransportOutcome
+         * @enum {string}
+         */
+        TransportOutcome: "response_received" | "dns_failure" | "connect_timeout" | "connection_failure" | "tls_failure" | "write_timeout" | "write_failure" | "read_timeout" | "read_failure" | "total_timeout" | "target_denied" | "redirect_denied" | "response_limit_exceeded" | "indeterminate";
         /** Format: uuid */
         UUID: string;
         VariableName: string;
+        /**
+         * Verdict
+         * @enum {string}
+         */
+        Verdict: "passed" | "functional_regression" | "performance_warning" | "observed_change" | "inconclusive" | "baseline_required" | "not_evaluated";
         Version: number;
     };
     responses: never;
@@ -1158,6 +1380,276 @@ export interface operations {
             };
             /** @description RFC 9457 problem response */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_executions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                project_id?: components["schemas"]["UUID"];
+                environment_id?: components["schemas"]["UUID"];
+                test_case_id?: components["schemas"]["UUID"];
+                suite_id?: components["schemas"]["UUID"];
+                status?: components["schemas"]["ExecutionStatus"] | null;
+                verdict?: components["schemas"]["Verdict"] | null;
+                created_from?: components["schemas"]["Timestamp"];
+                created_before?: components["schemas"]["Timestamp"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionPage"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_execution: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecutionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    /** @description Created resource path */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionDetail"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_execution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionDetail"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

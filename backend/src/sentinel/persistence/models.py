@@ -52,6 +52,7 @@ class EnvironmentRow(Base):
             use_alter=True,
             name="fk_environments_active_revision",
         ),
+        UniqueConstraint("id", "project_id", name="uq_environments_identity_project"),
         Index("ix_environments_project_list", "project_id", "created_at", "id"),
     )
 
@@ -254,25 +255,148 @@ class ChangeEventRow(Base):
 
 
 class ExecutionRow(Base):
-    """Minimal internal probe envelope; catalog revision references arrive later."""
+    """Execution envelope; nullable catalog pins preserve legacy M1 probe rows."""
 
     __tablename__ = "executions"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued','running','completed','failed')", name="execution_status"
         ),
-        CheckConstraint("verdict IS NULL OR verdict = 'not_evaluated'", name="execution_verdict"),
+        CheckConstraint(
+            "verdict IS NULL OR verdict IN ('passed','functional_regression',"
+            "'performance_warning','observed_change','inconclusive','baseline_required',"
+            "'not_evaluated')",
+            name="execution_verdict",
+        ),
         CheckConstraint(
             "(status IN ('completed','failed')) = (finished_at IS NOT NULL)",
             name="execution_terminal_time",
         ),
+        CheckConstraint(
+            "(project_id IS NULL AND environment_id IS NULL AND environment_revision_id IS NULL "
+            "AND source_type IS NULL AND source_id IS NULL AND source_revision_id IS NULL) OR "
+            "(project_id IS NOT NULL AND environment_id IS NOT NULL "
+            "AND environment_revision_id IS NOT NULL AND source_type IS NOT NULL "
+            "AND source_id IS NOT NULL AND source_revision_id IS NOT NULL)",
+            name="execution_materialization_shape",
+        ),
+        CheckConstraint(
+            "source_type IS NULL OR source_type IN ('test_case','suite')",
+            name="execution_source_type",
+        ),
+        ForeignKeyConstraint(
+            ["environment_id", "project_id"],
+            ["environments.id", "environments.project_id"],
+            ondelete="RESTRICT",
+            name="fk_executions_environment_project",
+        ),
+        ForeignKeyConstraint(
+            ["environment_revision_id", "environment_id"],
+            ["environment_revisions.id", "environment_revisions.environment_id"],
+            ondelete="RESTRICT",
+            name="fk_executions_environment_revision",
+        ),
+        UniqueConstraint("id", "project_id", name="uq_executions_identity_project"),
+        Index("ix_executions_project_created", "project_id", "created_at", "id"),
+        Index("ix_executions_source", "source_type", "source_id", "created_at", "id"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
+    project_id: Mapped[UUID | None] = mapped_column()
+    environment_id: Mapped[UUID | None] = mapped_column()
+    environment_revision_id: Mapped[UUID | None] = mapped_column()
+    source_type: Mapped[str | None] = mapped_column(String(16))
+    source_id: Mapped[UUID | None] = mapped_column()
+    source_revision_id: Mapped[UUID | None] = mapped_column()
     status: Mapped[str] = mapped_column(String(16))
     verdict: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ExecutionItemRow(Base):
+    __tablename__ = "execution_items"
+    __table_args__ = (
+        CheckConstraint("ordinal BETWEEN 0 AND 99", name="execution_item_ordinal"),
+        CheckConstraint(
+            "status IN ('pending','running','completed','indeterminate','failed','skipped')",
+            name="execution_item_status",
+        ),
+        CheckConstraint(
+            "verdict IS NULL OR verdict IN ('passed','functional_regression',"
+            "'performance_warning','observed_change','inconclusive','baseline_required',"
+            "'not_evaluated')",
+            name="execution_item_verdict",
+        ),
+        CheckConstraint(
+            "test_case_revision_version BETWEEN 1 AND 2147483647",
+            name="execution_item_revision_version",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND started_at IS NULL AND finished_at IS NULL) OR "
+            "(status <> 'pending')",
+            name="execution_item_pending_time",
+        ),
+        ForeignKeyConstraint(
+            ["execution_id", "project_id"],
+            ["executions.id", "executions.project_id"],
+            ondelete="RESTRICT",
+            name="fk_execution_items_execution_project",
+        ),
+        ForeignKeyConstraint(
+            ["test_case_id", "project_id"],
+            ["test_cases.id", "test_cases.project_id"],
+            ondelete="RESTRICT",
+            name="fk_execution_items_test_case_project",
+        ),
+        ForeignKeyConstraint(
+            ["test_case_revision_id", "test_case_id", "test_case_revision_version"],
+            [
+                "test_case_revisions.id",
+                "test_case_revisions.test_case_id",
+                "test_case_revisions.version",
+            ],
+            ondelete="RESTRICT",
+            name="fk_execution_items_test_case_revision",
+        ),
+        UniqueConstraint("execution_id", "ordinal", name="uq_execution_items_execution_ordinal"),
+        UniqueConstraint("execution_id", "test_case_id", name="uq_execution_items_execution_case"),
+        Index("ix_execution_items_execution_order", "execution_id", "ordinal"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    execution_id: Mapped[UUID]
+    ordinal: Mapped[int] = mapped_column(Integer)
+    project_id: Mapped[UUID]
+    test_case_id: Mapped[UUID]
+    test_case_revision_id: Mapped[UUID]
+    test_case_revision_version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16))
+    verdict: Mapped[str | None] = mapped_column(String(32))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class IdempotencyRecordRow(Base):
+    __tablename__ = "execution_idempotency"
+    __table_args__ = (
+        CheckConstraint("length(key_hash) = 64", name="execution_idempotency_key_hash"),
+        CheckConstraint("length(request_hash) = 64", name="execution_idempotency_request_hash"),
+        ForeignKeyConstraint(
+            ["execution_id"],
+            ["executions.id"],
+            ondelete="RESTRICT",
+            name="fk_idempotency_execution",
+        ),
+        UniqueConstraint("execution_id", "key_hash", name="uq_idempotency_execution_key"),
+        Index("ix_execution_idempotency_expiry", "expires_at"),
+    )
+
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    execution_id: Mapped[UUID]
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class JobRow(Base):

@@ -21,12 +21,14 @@ from sentinel.api.catalog.suite_openapi import suite_schemas
 from sentinel.api.catalog.suites import suite_router
 from sentinel.api.catalog.test_case_openapi import test_case_schemas
 from sentinel.api.catalog.test_cases import test_case_router
+from sentinel.api.executions import execution_router
 from sentinel.api.problems import problem, validation_problem
 from sentinel.catalog.environments import EnvironmentService
 from sentinel.catalog.projects import ProjectService
 from sentinel.catalog.suites import SuiteService
 from sentinel.catalog.test_cases import TestCaseService
 from sentinel.config import Settings
+from sentinel.execution.creation import PostgresExecutionService
 from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
 from sentinel.persistence.database import create_database
 from sentinel.persistence.readiness import database_is_current
@@ -45,6 +47,7 @@ class SentinelAPI(FastAPI):
         schema.setdefault("components", {}).setdefault("schemas", {}).update(catalog_schemas())
         schema["components"]["schemas"].update(test_case_schemas())
         schema["components"]["schemas"].update(suite_schemas())
+        _normalize_execution_openapi(schema)
         # FastAPI always adds its default JSON media type for a documented model.
         # Sentinel problem responses use RFC 9457's dedicated media type instead.
         for path in schema.get("paths", {}).values():
@@ -69,6 +72,111 @@ class SentinelAPI(FastAPI):
         return schema
 
 
+def _normalize_execution_openapi(schema: dict[str, Any]) -> None:
+    """Apply the shared UUID/timestamp primitives to execution schemas.
+
+    The execution models need Python ``UUID``/``datetime`` values for service
+    boundaries, while the public contract uses the repository's stricter
+    canonical primitives. Keep this normalization in the runtime OpenAPI
+    composition layer alongside the existing catalog schema composition.
+    """
+
+    schemas = schema.get("components", {}).get("schemas", {})
+    uuid_ref = {"$ref": "#/components/schemas/UUID"}
+    timestamp_ref = {"$ref": "#/components/schemas/Timestamp"}
+    nullable_timestamp = {"anyOf": [timestamp_ref, {"type": "null"}]}
+    id_fields = {
+        "ChangeEventOutput": {"id", "project_id", "subject_id", "before_ref", "after_ref"},
+        "AttemptSummary": {"id", "replayed_by_attempt_id"},
+        "ExecutionItem": {"id", "test_case_id", "test_case_revision_id"},
+        "ExecutionSummary": {
+            "id",
+            "project_id",
+            "environment_id",
+            "environment_revision_id",
+            "source_id",
+            "source_revision_id",
+        },
+        "ExecutionDetail": {
+            "id",
+            "project_id",
+            "environment_id",
+            "environment_revision_id",
+            "source_id",
+            "source_revision_id",
+        },
+    }
+    for name, fields in id_fields.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = (
+                    uuid_ref
+                    if field not in {"before_ref", "after_ref", "replayed_by_attempt_id"}
+                    else {"anyOf": [uuid_ref, {"type": "null"}]}
+                )
+
+    required_timestamps = {
+        "ChangeEventOutput": {"created_at"},
+        "AttemptSummary": {"created_at"},
+        "ExecutionSummary": {"created_at"},
+        "ExecutionDetail": {"created_at"},
+    }
+    optional_timestamps = {
+        "AttemptSummary": {"dispatch_recorded_at", "response_recorded_at", "finished_at"},
+        "ExecutionItem": {"started_at", "finished_at"},
+        "ExecutionSummary": {"started_at", "finished_at"},
+        "ExecutionDetail": {"started_at", "finished_at"},
+    }
+    for name, fields in required_timestamps.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = timestamp_ref
+    for name, fields in optional_timestamps.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = nullable_timestamp
+
+    create = schemas.get("ExecutionCreate", {})
+    schemas["ExecutionCreateTestCase"] = {
+        "additionalProperties": False,
+        "properties": {
+            "environment_id": uuid_ref,
+            "test_case_id": uuid_ref,
+        },
+        "required": ["environment_id", "test_case_id"],
+        "type": "object",
+    }
+    schemas["ExecutionCreateSuite"] = {
+        "additionalProperties": False,
+        "properties": {
+            "environment_id": uuid_ref,
+            "suite_id": uuid_ref,
+        },
+        "required": ["environment_id", "suite_id"],
+        "type": "object",
+    }
+    create.clear()
+    create.update(
+        {
+            "oneOf": [
+                {"$ref": "#/components/schemas/ExecutionCreateTestCase"},
+                {"$ref": "#/components/schemas/ExecutionCreateSuite"},
+            ],
+            "title": "ExecutionCreate",
+        }
+    )
+
+    query = schema.get("paths", {}).get("/api/v1/executions", {}).get("get", {})
+    for parameter in query.get("parameters", []):
+        if parameter.get("name") in {"project_id", "environment_id", "test_case_id", "suite_id"}:
+            parameter["schema"] = uuid_ref
+        elif parameter.get("name") in {"created_from", "created_before"}:
+            parameter["schema"] = timestamp_ref
+
+
 class Liveness(BaseModel):
     status: Literal["alive"] = "alive"
 
@@ -88,6 +196,7 @@ def create_app(
     environment_service: EnvironmentService | None = None,
     test_case_service: TestCaseService | None = None,
     suite_service: SuiteService | None = None,
+    execution_service: PostgresExecutionService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url.get_secret_value())
@@ -127,6 +236,13 @@ def create_app(
         clock=lambda: datetime.now(UTC),
     )
     app.include_router(suite_router(suites))
+    executions = execution_service or PostgresExecutionService(
+        sessions,
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+        max_deliveries=settings.max_deliveries,
+    )
+    app.include_router(execution_router(executions))
 
     async def tempo_ready() -> bool:
         try:
