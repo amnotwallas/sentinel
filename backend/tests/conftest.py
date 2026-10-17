@@ -18,9 +18,11 @@ from sentinel.persistence.models import (
     IdempotencyRecordRow,
     JobRow,
     ProjectRow,
+    ResponseArtifactRow,
     SuiteRevisionItemRow,
     SuiteRevisionRow,
     SuiteRow,
+    TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
 )
@@ -61,6 +63,8 @@ def engine() -> Iterator[Engine]:
     with engine.begin() as conn:
         conn.execute(text("SET CONSTRAINTS fk_environments_active_revision DEFERRED"))
         conn.execute(delete(IdempotencyRecordRow))
+        conn.execute(delete(ResponseArtifactRow))
+        conn.execute(delete(TestAttemptRow))
         conn.execute(delete(ExecutionItemRow))
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))

@@ -377,6 +377,207 @@ class ExecutionItemRow(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class TestAttemptRow(Base):
+    """Durable attempt checkpoints; request/response secrets never live here."""
+
+    __test__ = False
+    __tablename__ = "test_attempts"
+    __table_args__ = (
+        CheckConstraint("sequence BETWEEN 1 AND 2147483647", name="test_attempt_sequence"),
+        CheckConstraint(
+            "state IN ('prepared','dispatching','response_received','transport_failed',"
+            "'evaluated','replay_scheduled','indeterminate','failed')",
+            name="test_attempt_state",
+        ),
+        CheckConstraint(
+            "dispatch_certainty IN ('not_started','not_sent','possibly_sent','response_received')",
+            name="test_attempt_dispatch_certainty",
+        ),
+        CheckConstraint(
+            "transport_outcome IS NULL OR transport_outcome IN ('response_received','dns_failure',"
+            "'connect_timeout','connection_failure','tls_failure','write_timeout','write_failure',"
+            "'read_timeout','read_failure','total_timeout','target_denied','redirect_denied',"
+            "'response_limit_exceeded','indeterminate')",
+            name="test_attempt_transport_outcome",
+        ),
+        CheckConstraint(
+            "preparation_error_code IS NULL OR preparation_error_code IN ('secret_missing',"
+            "'template_variable_missing','target_policy_denied','request_invalid',"
+            "'tls_verification_required','infrastructure_failure')",
+            name="test_attempt_preparation_error",
+        ),
+        CheckConstraint(
+            "redirect_rejection_code IS NULL OR redirect_rejection_code IN ('method_not_allowed',"
+            "'location_missing','location_invalid','scheme_denied','port_denied','target_denied',"
+            "'redirect_limit_exceeded')",
+            name="test_attempt_redirect_rejection",
+        ),
+        CheckConstraint("duration_ms IS NULL OR duration_ms >= 0", name="test_attempt_duration"),
+        CheckConstraint(
+            "request_fingerprint IS NULL OR length(request_fingerprint) = 64",
+            name="test_attempt_fingerprint",
+        ),
+        CheckConstraint(
+            "primary_trace_id IS NULL OR length(primary_trace_id) = 32",
+            name="test_attempt_trace_id",
+        ),
+        CheckConstraint(
+            "client_span_id IS NULL OR length(client_span_id) = 16",
+            name="test_attempt_span_id",
+        ),
+        CheckConstraint(
+            "((state = 'prepared' AND dispatch_certainty = 'not_started' AND "
+            "preparation_error_code IS NULL) OR "
+            "(state = 'failed' AND dispatch_certainty = 'not_started' AND "
+            "preparation_error_code IS NOT NULL) OR "
+            "(state = 'failed' AND dispatch_certainty <> 'not_started' AND "
+            "preparation_error_code IS NULL) OR state NOT IN ('prepared','failed'))",
+            name="test_attempt_preparation_shape",
+        ),
+        CheckConstraint(
+            "(state IN ('dispatching','response_received','transport_failed','evaluated',"
+            "'replay_scheduled','indeterminate') AND request_fingerprint IS NOT NULL "
+            "AND primary_trace_id IS NOT NULL AND client_span_id IS NOT NULL "
+            "AND dispatch_recorded_at IS NOT NULL) OR "
+            "state = 'prepared' OR "
+            "(state = 'failed' AND dispatch_certainty = 'not_started') OR "
+            "(state = 'failed' AND dispatch_certainty <> 'not_started' "
+            "AND request_fingerprint IS NOT NULL AND primary_trace_id IS NOT NULL "
+            "AND client_span_id IS NOT NULL AND dispatch_recorded_at IS NOT NULL)",
+            name="test_attempt_dispatch_shape",
+        ),
+        CheckConstraint(
+            "(state = 'prepared' AND request_fingerprint IS NULL AND primary_trace_id IS NULL "
+            "AND client_span_id IS NULL AND dispatch_recorded_at IS NULL) OR "
+            "(state = 'failed' AND dispatch_certainty = 'not_started' "
+            "AND request_fingerprint IS NULL AND primary_trace_id IS NULL "
+            "AND client_span_id IS NULL AND dispatch_recorded_at IS NULL) OR "
+            "(state NOT IN ('prepared','failed') OR dispatch_certainty <> 'not_started')",
+            name="test_attempt_pre_dispatch_fields",
+        ),
+        CheckConstraint(
+            "state <> 'response_received' OR (response_recorded_at IS NOT NULL "
+            "AND dispatch_certainty = 'response_received' "
+            "AND transport_outcome = 'response_received')",
+            name="test_attempt_response_shape",
+        ),
+        CheckConstraint(
+            "state <> 'transport_failed' OR (transport_outcome IS NOT NULL "
+            "AND transport_outcome <> 'response_received')",
+            name="test_attempt_transport_failure_shape",
+        ),
+        CheckConstraint(
+            "(dispatch_certainty = 'not_sent' AND state = 'transport_failed' AND "
+            "transport_outcome IN ('dns_failure','connect_timeout','connection_failure',"
+            "'tls_failure','target_denied')) OR dispatch_certainty <> 'not_sent'",
+            name="test_attempt_not_sent_shape",
+        ),
+        CheckConstraint(
+            "(state = 'dispatching' AND dispatch_certainty = 'possibly_sent') OR "
+            "(state = 'response_received' AND dispatch_certainty = 'response_received' "
+            "AND transport_outcome = 'response_received') OR "
+            "(state = 'transport_failed' AND ((dispatch_certainty = 'not_sent' AND "
+            "transport_outcome IN ('dns_failure','connect_timeout','connection_failure',"
+            "'tls_failure','target_denied')) OR (dispatch_certainty = 'possibly_sent' AND "
+            "transport_outcome IN ('write_timeout','write_failure','read_timeout','read_failure',"
+            "'total_timeout','indeterminate','response_limit_exceeded')) OR "
+            "(dispatch_certainty = 'response_received' AND transport_outcome IN "
+            "('redirect_denied','read_timeout','read_failure','dns_failure','connect_timeout',"
+            "'connection_failure','tls_failure','target_denied')))) OR "
+            "(state IN ('evaluated','replay_scheduled','indeterminate') AND "
+            "dispatch_certainty <> 'not_started') OR "
+            "(state = 'prepared' AND dispatch_certainty = 'not_started') OR "
+            "(state = 'failed')",
+            name="test_attempt_outcome_matrix",
+        ),
+        CheckConstraint(
+            "redirect_rejection_code IS NULL OR transport_outcome = 'redirect_denied'",
+            name="test_attempt_redirect_code_shape",
+        ),
+        CheckConstraint(
+            "replay_successor_id IS NULL OR replay_successor_id <> id",
+            name="test_attempt_replay_not_self",
+        ),
+        CheckConstraint(
+            "state <> 'replay_scheduled' OR replay_successor_id IS NOT NULL",
+            name="test_attempt_replay_shape",
+        ),
+        ForeignKeyConstraint(
+            ["execution_item_id"],
+            ["execution_items.id"],
+            ondelete="RESTRICT",
+            name="fk_test_attempts_execution_item",
+        ),
+        ForeignKeyConstraint(
+            ["replay_successor_id"],
+            ["test_attempts.id"],
+            ondelete="RESTRICT",
+            name="fk_test_attempts_replay_successor",
+        ),
+        UniqueConstraint("execution_item_id", "sequence", name="uq_test_attempts_item_sequence"),
+        UniqueConstraint("replay_successor_id", name="uq_test_attempts_replay_successor"),
+        Index("ix_test_attempts_item_state", "execution_item_id", "state", "sequence"),
+        Index(
+            "ix_test_attempts_dispatching", "state", "dispatch_certainty", "dispatch_recorded_at"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    execution_item_id: Mapped[UUID]
+    sequence: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(24))
+    dispatch_certainty: Mapped[str] = mapped_column(String(24))
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    dispatch_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    response_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    transport_outcome: Mapped[str | None] = mapped_column(String(32))
+    preparation_error_code: Mapped[str | None] = mapped_column(String(32))
+    redirect_rejection_code: Mapped[str | None] = mapped_column(String(32))
+    replay_successor_id: Mapped[UUID | None]
+    primary_trace_id: Mapped[str | None] = mapped_column(String(32))
+    client_span_id: Mapped[str | None] = mapped_column(String(16))
+    included_in_verdict: Mapped[bool] = mapped_column(default=True)
+
+
+class ResponseArtifactRow(Base):
+    """One bounded, already-redacted observation per attempt."""
+
+    __tablename__ = "response_artifacts"
+    __table_args__ = (
+        CheckConstraint("status_code BETWEEN 100 AND 599", name="response_artifact_status"),
+        CheckConstraint(
+            "body_kind IS NULL OR body_kind IN ('json','text','bytes')",
+            name="response_artifact_body_kind",
+        ),
+        CheckConstraint("source_bytes_captured >= 0", name="response_artifact_source_bytes"),
+        CheckConstraint(
+            "(body_kind IS NULL AND body_content IS NULL) OR "
+            "(body_kind IS NOT NULL AND body_content IS NOT NULL)",
+            name="response_artifact_body_shape",
+        ),
+        ForeignKeyConstraint(
+            ["attempt_id"],
+            ["test_attempts.id"],
+            ondelete="RESTRICT",
+            name="fk_response_artifacts_attempt",
+        ),
+    )
+
+    attempt_id: Mapped[UUID] = mapped_column(primary_key=True)
+    status_code: Mapped[int] = mapped_column(Integer)
+    headers: Mapped[dict[str, object]] = mapped_column(JSONB)
+    body_kind: Mapped[str | None] = mapped_column(String(16))
+    body_content: Mapped[object | None] = mapped_column(JSONB)
+    source_bytes_captured: Mapped[int] = mapped_column(Integer)
+    truncated: Mapped[bool] = mapped_column(default=False)
+    redaction_unavailable: Mapped[bool] = mapped_column(default=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class IdempotencyRecordRow(Base):
     __tablename__ = "execution_idempotency"
     __table_args__ = (
