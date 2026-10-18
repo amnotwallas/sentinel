@@ -7,10 +7,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
 from types import MappingProxyType
+from typing import cast
 from urllib.parse import urlencode, urljoin
 
 from sentinel.catalog.definitions import TestDefinition
-from sentinel.catalog.environments import EnvironmentDocument
+from sentinel.catalog.environments import EnvironmentDocument, TargetPolicy
 from sentinel.regression.policy import canonical_json
 from sentinel.security.secrets import SecretNotFound, SecretResolver
 
@@ -44,9 +45,18 @@ class PreparedRequest:
     verify_tls: bool
     max_response_bytes: int
     secret_derived_headers: frozenset[str]
+    target_policy: TargetPolicy = TargetPolicy()
+    redaction_json_pointers: tuple[str, ...] = ()
+    redaction_header_names: tuple[str, ...] = ()
+    secret_values: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "headers", MappingProxyType(dict(self.headers)))
+        object.__setattr__(
+            self,
+            "secret_derived_headers",
+            frozenset(name.lower() for name in self.secret_derived_headers),
+        )
 
     def __repr__(self) -> str:
         return (
@@ -79,6 +89,7 @@ def _resolve_value(
     variables: Mapping[str, str],
     resolver: SecretResolver,
     secret_derived_headers: set[str] | None = None,
+    secret_values: set[str] | None = None,
     header_name: str | None = None,
     allowed_secrets: frozenset[str] = frozenset(),
 ) -> object:
@@ -97,6 +108,8 @@ def _resolve_value(
                 raise PreparationError("infrastructure_failure") from None
             if secret_derived_headers is not None and header_name is not None:
                 secret_derived_headers.add(header_name)
+            if secret_values is not None:
+                secret_values.add(resolved)
             return resolved
         if "$secret" in value:
             raise PreparationError("request_invalid")
@@ -106,6 +119,7 @@ def _resolve_value(
                 variables=variables,
                 resolver=resolver,
                 secret_derived_headers=secret_derived_headers,
+                secret_values=secret_values,
                 header_name=header_name,
                 allowed_secrets=allowed_secrets,
             )
@@ -118,6 +132,7 @@ def _resolve_value(
                 variables=variables,
                 resolver=resolver,
                 secret_derived_headers=secret_derived_headers,
+                secret_values=secret_values,
                 header_name=header_name,
                 allowed_secrets=allowed_secrets,
             )
@@ -175,6 +190,7 @@ def prepare_request(
         raise PreparationError("request_invalid")
     headers: dict[str, str] = {}
     secret_headers: set[str] = set()
+    secret_values: set[str] = set()
     for item in headers_value:
         if not isinstance(item, Mapping) or not isinstance(item.get("name"), str):
             raise PreparationError("request_invalid")
@@ -187,6 +203,7 @@ def prepare_request(
             secret_derived_headers=secret_headers,
             header_name=name,
             allowed_secrets=allowed_secrets,
+            secret_values=secret_values,
         )
         if not isinstance(resolved, str):
             raise PreparationError("request_invalid")
@@ -199,7 +216,11 @@ def prepare_request(
             raise PreparationError("request_invalid")
         kind, value = body_value.get("kind"), body_value.get("value")
         resolved = _resolve_value(
-            value, variables=variables, resolver=resolver, allowed_secrets=allowed_secrets
+            value,
+            variables=variables,
+            resolver=resolver,
+            allowed_secrets=allowed_secrets,
+            secret_values=secret_values,
         )
         if kind == "json":
             try:
@@ -225,6 +246,20 @@ def prepare_request(
             verify_tls=True,
             max_response_bytes=int(request["max_response_bytes"]),
             secret_derived_headers=frozenset(secret_headers),
+            target_policy=environment.target_policy,
+            redaction_json_pointers=tuple(
+                cast(
+                    list[str],
+                    cast(Mapping[str, object], document["redaction"])["json_pointers"],
+                )
+            ),
+            redaction_header_names=tuple(
+                cast(
+                    list[str],
+                    cast(Mapping[str, object], document["redaction"])["header_names"],
+                )
+            ),
+            secret_values=tuple(sorted(secret_values)),
         )
     except (KeyError, TypeError, ValueError):
         raise PreparationError("request_invalid") from None

@@ -29,6 +29,9 @@ class TransportResult:
     body: bytes | None
     source_bytes_captured: int
     truncated: bool
+    redirect_rejection_code: RedirectRejectionCode | None = None
+    redaction_unavailable: bool = False
+    not_sent_proof: str | None = None
 
 
 class TransportAdapter(Protocol):

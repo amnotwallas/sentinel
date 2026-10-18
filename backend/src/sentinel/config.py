@@ -1,4 +1,6 @@
+import ssl
 from ipaddress import ip_address
+from pathlib import Path
 from typing import Self
 
 from pydantic import Field, SecretStr, model_validator
@@ -20,6 +22,7 @@ class Settings(BaseSettings):
     poll_seconds: float = Field(default=1, ge=0.05, le=1)
     tempo_url: str = "http://127.0.0.1:3200"
     otlp_endpoint: str | None = None
+    target_ca_bundle: str | None = Field(default=None, repr=False)
 
     @model_validator(mode="after")
     def validate_safety(self) -> Self:
@@ -33,4 +36,12 @@ class Settings(BaseSettings):
             raise ValueError("non-loopback API binding requires api_token")
         if self.heartbeat_seconds >= self.lease_seconds / 2:
             raise ValueError("heartbeat must be less than half the lease duration")
+        if self.target_ca_bundle is not None:
+            path = Path(self.target_ca_bundle)
+            if not path.is_absolute():
+                raise ValueError("target_ca_bundle must be an absolute path")
+            try:
+                ssl.create_default_context().load_verify_locations(cafile=path)
+            except (OSError, ssl.SSLError):
+                raise ValueError("target_ca_bundle_invalid") from None
         return self

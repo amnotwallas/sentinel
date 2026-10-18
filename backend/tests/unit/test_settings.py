@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -25,3 +27,17 @@ def test_settings_repr_hides_credentials() -> None:
         api_token=SecretStr("canary-token"),
     )
     assert "canary" not in repr(settings)
+
+
+def test_target_ca_bundle_requires_absolute_valid_pem(tmp_path: Path) -> None:
+    invalid = tmp_path / "invalid.pem"
+    invalid.write_text("not-a-certificate", encoding="utf-8")
+    with pytest.raises(ValidationError):
+        Settings(target_ca_bundle=str(invalid))
+    with pytest.raises(ValidationError):
+        Settings(target_ca_bundle="relative.pem")
+
+
+def test_target_ca_bundle_path_is_not_in_settings_repr() -> None:
+    settings = Settings(target_ca_bundle=None)
+    assert "target_ca_bundle" not in repr(settings)
