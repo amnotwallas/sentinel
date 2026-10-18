@@ -109,6 +109,8 @@ def test_status_errors_are_accepted_and_capture_is_bounded() -> None:
     assert result.status_code == 500
     assert result.truncated is True
     assert result.body == b"0123"
+    assert result.body_kind == "text"
+    assert result.body_content == "0123"
     assert result.headers["x-secret"] == "[REDACTED]"
 
 
@@ -187,7 +189,7 @@ def test_partial_body_is_a_sanitized_response_received_read_failure() -> None:
     assert result.body == b"partial"
 
 
-def test_total_timeout_is_enforced_during_response_streaming(
+def test_total_deadline_after_response_head_is_a_read_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class AdvancingClock:
@@ -219,7 +221,7 @@ def test_total_timeout_is_enforced_during_response_streaming(
     prepared = request("http://api.test/probe")
     object.__setattr__(prepared, "timeout_ms", 500)
     result = transport.dispatch(prepared)
-    assert result.outcome == TransportOutcome.TOTAL_TIMEOUT
+    assert result.outcome == TransportOutcome.READ_TIMEOUT
     assert result.certainty == DispatchCertainty.RESPONSE_RECEIVED
 
 

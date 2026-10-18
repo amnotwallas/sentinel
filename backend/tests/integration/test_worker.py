@@ -10,7 +10,7 @@ from sentinel.execution.domain import InfrastructureFailure, Lease
 from sentinel.execution.service import WorkService
 from sentinel.persistence.models import ExecutionRow, JobRow
 from sentinel.persistence.queue import PostgresJobStore
-from sentinel.worker.runtime import Worker
+from sentinel.worker.runtime import HandlerCompletion, Worker, WorkerCancellation
 from tests.conftest import Clock
 
 pytestmark = pytest.mark.integration
@@ -48,13 +48,14 @@ async def test_worker_heartbeat_during_handler(
     async def health() -> None:
         beat_done.set()
 
-    async def handler(_: Lease) -> None:
+    async def handler(_: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
         heartbeat_due.set()
         await beat_done.wait()
         with Session(engine) as session:
             job = session.get(JobRow, probe.job_id)
             assert job is not None
             assert job.lease_expires_at == clock.value + timedelta(seconds=60)
+        return HandlerCompletion.AUTOMATIC
 
     worker = Worker(service, uuid4(), handlers={"probe": handler}, delay=delay, health=health)
     # Default start is at 00:00:00; after heartbeat expiration must be 00:01:15.
@@ -75,12 +76,14 @@ async def test_lease_loss_cancels_handler_before_completion(
         await started.wait()
         clock.advance(60)
 
-    async def handler(_: Lease) -> None:
+    async def handler(_: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
         started.set()
         try:
-            await asyncio.Event().wait()
+            await asyncio.to_thread(cancellation.wait)
+            cancellation.raise_if_cancelled()
         finally:
             cancelled.set()
+        raise AssertionError("unreachable")
 
     worker = Worker(service, uuid4(), handlers={"probe": handler}, delay=delay)
     await worker.run_once()
@@ -106,7 +109,7 @@ async def test_worker_classifies_handler_failures_without_logging_raw_error(
     service = WorkService(store)
     probe = service.enqueue_probe()
 
-    async def handler(_: Lease) -> None:
+    async def handler(_: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
         raise error
 
     await Worker(service, uuid4(), handlers={"probe": handler}).run_once()
@@ -126,12 +129,14 @@ async def test_shutdown_cancels_handler_and_leaves_reclaimable_lease(
     started = asyncio.Event()
     cancelled = asyncio.Event()
 
-    async def handler(_: Lease) -> None:
+    async def handler(_: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
         started.set()
         try:
-            await asyncio.Event().wait()
+            await asyncio.to_thread(cancellation.wait)
+            cancellation.raise_if_cancelled()
         finally:
             cancelled.set()
+        raise AssertionError("unreachable")
 
     task = asyncio.create_task(Worker(service, uuid4(), handlers={"probe": handler}).run_once())
     await started.wait()
@@ -177,12 +182,14 @@ async def test_heartbeat_failure_cancels_work_without_checkpointing(
     async def delay(_: float) -> None:
         await started.wait()
 
-    async def handler(_: Lease) -> None:
+    async def handler(_: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
         started.set()
         try:
-            await asyncio.Event().wait()
+            await asyncio.to_thread(cancellation.wait)
+            cancellation.raise_if_cancelled()
         finally:
             cancelled.set()
+        raise AssertionError("unreachable")
 
     await Worker(service, uuid4(), handlers={"probe": handler}, delay=delay).run_once()
     assert cancelled.is_set()

@@ -140,13 +140,9 @@ class PostgresAttemptStore:
     def _owned(
         self, session: Session, attempt_id: UUID, lease: Lease
     ) -> tuple[TestAttemptRow, datetime]:
-        row = session.scalar(
-            select(TestAttemptRow)
-            .join(ExecutionItemRow, ExecutionItemRow.id == TestAttemptRow.execution_item_id)
-            .join(ExecutionRow, ExecutionRow.id == ExecutionItemRow.execution_id)
-            .join(JobRow, JobRow.subject_id == ExecutionRow.id)
+        job = session.scalar(
+            select(JobRow)
             .where(
-                TestAttemptRow.id == attempt_id,
                 JobRow.id == lease.job_id,
                 JobRow.state == "leased",
                 JobRow.lease_owner == lease.owner,
@@ -155,11 +151,40 @@ class PostgresAttemptStore:
             .with_for_update()
         )
         now = self._now(session)
-        if row is None:
-            raise LeaseLost("lease no longer owns attempt")
-        job = session.scalar(select(JobRow).where(JobRow.id == lease.job_id))
-        if job is None or job.lease_expires_at is None or job.lease_expires_at <= now:
+        if (
+            job is None
+            or job.subject_id != lease.subject_id
+            or job.lease_expires_at is None
+            or job.lease_expires_at <= now
+        ):
             raise LeaseLost("lease expired")
+        execution = session.scalar(
+            select(ExecutionRow).where(ExecutionRow.id == job.subject_id).with_for_update()
+        )
+        if execution is None:
+            raise LeaseLost("lease no longer owns attempt")
+        item_id = session.scalar(
+            select(TestAttemptRow.execution_item_id).where(TestAttemptRow.id == attempt_id)
+        )
+        if item_id is None:
+            raise AttemptNotFound
+        item = session.scalar(
+            select(ExecutionItemRow)
+            .where(
+                ExecutionItemRow.id == item_id,
+                ExecutionItemRow.execution_id == execution.id,
+            )
+            .with_for_update()
+        )
+        if item is None:
+            raise LeaseLost("lease no longer owns attempt")
+        row = session.scalar(
+            select(TestAttemptRow)
+            .where(TestAttemptRow.id == attempt_id, TestAttemptRow.execution_item_id == item.id)
+            .with_for_update()
+        )
+        if row is None:
+            raise AttemptNotFound
         return row, now
 
     @staticmethod
@@ -208,10 +233,22 @@ class PostgresAttemptStore:
             return self._record(row)
 
     def record_response(
-        self, attempt_id: UUID, lease: Lease, artifact: ResponseArtifact
+        self,
+        attempt_id: UUID,
+        lease: Lease,
+        artifact: ResponseArtifact,
+        *,
+        outcome: TransportOutcome,
     ) -> AttemptRecord:
         if artifact.attempt_id != attempt_id:
             raise AttemptConflict("artifact attempt mismatch")
+        if outcome not in {
+            TransportOutcome.RESPONSE_RECEIVED,
+            TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+        }:
+            raise AttemptConflict("invalid accepted response outcome")
+        if artifact.truncated != (outcome == TransportOutcome.RESPONSE_LIMIT_EXCEEDED):
+            raise AttemptConflict("response outcome does not match bounded capture")
         if artifact.expires_at > artifact.recorded_at + self.artifact_retention:
             raise AttemptConflict("artifact retention exceeds policy")
         with self.sessions.begin() as session:
@@ -235,7 +272,7 @@ class PostgresAttemptStore:
             )
             row.state = AttemptState.RESPONSE_RECEIVED
             row.dispatch_certainty = DispatchCertainty.RESPONSE_RECEIVED
-            row.transport_outcome = TransportOutcome.RESPONSE_RECEIVED
+            row.transport_outcome = outcome
             row.response_recorded_at = artifact.recorded_at
             row.finished_at = now
             row.duration_ms = max(0, int((now - row.created_at).total_seconds() * 1000))
@@ -255,7 +292,11 @@ class PostgresAttemptStore:
         if artifact is not None and artifact.attempt_id != attempt_id:
             raise AttemptConflict("artifact attempt mismatch")
         if (
-            outcome == TransportOutcome.RESPONSE_RECEIVED
+            outcome
+            in {
+                TransportOutcome.RESPONSE_RECEIVED,
+                TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+            }
             or certainty == DispatchCertainty.NOT_STARTED
         ):
             raise AttemptConflict("invalid transport failure certainty")

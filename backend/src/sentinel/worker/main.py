@@ -13,7 +13,8 @@ from sentinel.execution.service import WorkService
 from sentinel.persistence.database import create_database
 from sentinel.persistence.queue import PostgresJobStore
 from sentinel.telemetry.runtime import event, provider
-from sentinel.worker.runtime import Worker
+from sentinel.worker.execution import build_execution_orchestrator, execution_handler
+from sentinel.worker.runtime import Worker, joined_to_thread, probe_handler
 
 HEALTH_FILE = Path("/tmp/sentinel-worker-health")
 
@@ -34,17 +35,23 @@ async def run(settings: Settings) -> None:
         loop.add_signal_handler(sig, shutdown)
 
     async def healthy() -> None:
-        await asyncio.to_thread(HEALTH_FILE.touch)
+        await joined_to_thread(HEALTH_FILE.touch)
 
+    worker_tracer = tracing.get_tracer(__name__)
+    orchestrator = build_execution_orchestrator(sessions, settings, worker_tracer)
     worker = Worker(
         WorkService(PostgresJobStore(sessions), settings.lease_seconds, settings.max_deliveries),
         uuid4(),
         heartbeat_seconds=settings.heartbeat_seconds,
+        handlers={
+            "probe": probe_handler,
+            "execute_execution": execution_handler(orchestrator),
+        },
         health=healthy,
-        tracer=tracing.get_tracer(__name__),
+        tracer=worker_tracer,
     )
     event("worker_started")
-    await asyncio.to_thread(HEALTH_FILE.unlink, missing_ok=True)
+    await joined_to_thread(HEALTH_FILE.unlink, missing_ok=True)
     try:
         while not stop.is_set():
             try:
@@ -67,9 +74,9 @@ async def run(settings: Settings) -> None:
                 except TimeoutError:
                     pass
     finally:
-        await asyncio.to_thread(HEALTH_FILE.unlink, missing_ok=True)
-        await asyncio.to_thread(engine.dispose)
-        await asyncio.to_thread(tracing.shutdown)
+        await joined_to_thread(HEALTH_FILE.unlink, missing_ok=True)
+        await joined_to_thread(engine.dispose)
+        await joined_to_thread(tracing.shutdown)
         event("worker_stopped")
 
 

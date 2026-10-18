@@ -1,9 +1,13 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
+from alembic.command import downgrade, upgrade
+from alembic.config import Config
+from sqlalchemy import select, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import DatabaseError, IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from sentinel.execution.attempts import ResponseArtifact
@@ -160,11 +164,305 @@ def test_attempt_checkpoint_and_redacted_response_are_fenced(
             NOW,
             NOW + timedelta(days=7),
         ),
+        outcome=TransportOutcome.RESPONSE_RECEIVED,
     )
     assert completed.state.value == "response_received"
     with Session(engine) as session:
         row = session.scalar(select(TestAttemptRow).where(TestAttemptRow.id == attempt.id))
         assert row is not None and row.request_fingerprint == "a" * 64
+
+
+def test_bounded_final_capture_preserves_response_limit_outcome(
+    engine: Engine, seeded_attempt_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+
+    completed = store.record_response(
+        attempt.id,
+        lease,
+        ResponseArtifact(
+            attempt.id,
+            200,
+            {},
+            "text",
+            "bounded",
+            7,
+            True,
+            False,
+            NOW,
+            NOW + timedelta(days=7),
+        ),
+        outcome=TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+    )
+
+    assert completed.state.value == "response_received"
+    assert completed.dispatch_certainty == DispatchCertainty.RESPONSE_RECEIVED
+    assert completed.transport_outcome == TransportOutcome.RESPONSE_LIMIT_EXCEEDED
+
+
+@pytest.mark.parametrize(
+    ("outcome", "stored_truncated", "invalid_truncated"),
+    [
+        (TransportOutcome.RESPONSE_RECEIVED, False, True),
+        (TransportOutcome.RESPONSE_LIMIT_EXCEEDED, True, False),
+    ],
+)
+def test_database_rejects_response_outcome_artifact_mismatch(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    outcome: TransportOutcome,
+    stored_truncated: bool,
+    invalid_truncated: bool,
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    store.record_response(
+        attempt.id,
+        lease,
+        ResponseArtifact(
+            attempt.id,
+            200,
+            {},
+            "text",
+            "bounded",
+            7,
+            stored_truncated,
+            False,
+            NOW,
+            NOW + timedelta(days=7),
+        ),
+        outcome=outcome,
+    )
+
+    with pytest.raises(DatabaseError):
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE response_artifacts SET truncated = :truncated WHERE attempt_id = :id"),
+                {"id": attempt.id, "truncated": invalid_truncated},
+            )
+
+
+@pytest.mark.parametrize(
+    ("stored_outcome", "truncated", "invalid_outcome"),
+    [
+        (
+            TransportOutcome.RESPONSE_RECEIVED,
+            False,
+            TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+        ),
+        (
+            TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+            True,
+            TransportOutcome.RESPONSE_RECEIVED,
+        ),
+    ],
+)
+def test_database_rejects_attempt_outcome_artifact_mismatch(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    stored_outcome: TransportOutcome,
+    truncated: bool,
+    invalid_outcome: TransportOutcome,
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    store.record_response(
+        attempt.id,
+        lease,
+        ResponseArtifact(
+            attempt.id,
+            200,
+            {},
+            "text",
+            "bounded",
+            7,
+            truncated,
+            False,
+            NOW,
+            NOW + timedelta(days=7),
+        ),
+        outcome=stored_outcome,
+    )
+
+    with pytest.raises(DatabaseError):
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE test_attempts SET transport_outcome = :outcome WHERE id = :id"),
+                {"id": attempt.id, "outcome": invalid_outcome},
+            )
+
+
+def test_response_outcome_migration_downgrade_preserves_compatible_evidence(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_url = engine.url.render_as_string(hide_password=False)
+    monkeypatch.setenv("SENTINEL_DATABASE_URL", database_url)
+    config = Config(str(Path(__file__).parents[2] / "alembic.ini"))
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    store.record_response(
+        attempt.id,
+        lease,
+        ResponseArtifact(
+            attempt.id,
+            200,
+            {},
+            "text",
+            "bounded",
+            7,
+            True,
+            False,
+            NOW,
+            NOW + timedelta(days=7),
+        ),
+        outcome=TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+    )
+
+    try:
+        downgrade(config, "0008")
+        with engine.connect() as connection:
+            assert (
+                connection.scalar(
+                    text("SELECT transport_outcome FROM test_attempts WHERE id = :id"),
+                    {"id": attempt.id},
+                )
+                == TransportOutcome.RESPONSE_RECEIVED
+            )
+            assert connection.execute(
+                text(
+                    "SELECT count(*), bool_and(truncated) FROM response_artifacts "
+                    "WHERE attempt_id = :id"
+                ),
+                {"id": attempt.id},
+            ).one() == (1, True)
+        upgrade(config, "head")
+        with engine.connect() as connection:
+            assert (
+                connection.scalar(
+                    text("SELECT transport_outcome FROM test_attempts WHERE id = :id"),
+                    {"id": attempt.id},
+                )
+                == TransportOutcome.RESPONSE_LIMIT_EXCEEDED
+            )
+            assert connection.execute(
+                text(
+                    "SELECT count(*), bool_and(truncated) FROM response_artifacts "
+                    "WHERE attempt_id = :id"
+                ),
+                {"id": attempt.id},
+            ).one() == (1, True)
+    finally:
+        upgrade(config, "head")
+
+
+def test_migration_grandfathers_legacy_limit_failure_but_rejects_new_writes(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_url = engine.url.render_as_string(hide_password=False)
+    monkeypatch.setenv("SENTINEL_DATABASE_URL", database_url)
+    config = Config(str(Path(__file__).parents[2] / "alembic.ini"))
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    legacy = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    candidate = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    for attempt in (legacy, candidate):
+        store.checkpoint_dispatch(
+            attempt.id,
+            lease,
+            fingerprint="a" * 64,
+            trace_id=("b" if attempt.id == legacy.id else "d") * 32,
+            span_id=("c" if attempt.id == legacy.id else "e") * 16,
+        )
+
+    try:
+        downgrade(config, "0008")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE test_attempts SET state = 'transport_failed', "
+                    "transport_outcome = 'response_limit_exceeded', finished_at = :now, "
+                    "duration_ms = 0 WHERE id = :id"
+                ),
+                {"id": legacy.id, "now": NOW},
+            )
+        upgrade(config, "head")
+
+        with engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT state, dispatch_certainty, transport_outcome "
+                    "FROM test_attempts WHERE id = :id"
+                ),
+                {"id": legacy.id},
+            ).one() == (
+                "transport_failed",
+                "possibly_sent",
+                "response_limit_exceeded",
+            )
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "UPDATE test_attempts SET state = 'transport_failed', "
+                        "transport_outcome = 'response_limit_exceeded', finished_at = :now, "
+                        "duration_ms = 0 WHERE id = :id"
+                    ),
+                    {"id": candidate.id, "now": NOW},
+                )
+    finally:
+        upgrade(config, "head")
 
 
 def test_expired_lease_cannot_commit_attempt_outcome(
@@ -216,6 +514,80 @@ def test_not_sent_requires_positive_phase_proof(
         not_sent_proof="dns_failure",
     )
     assert failed.dispatch_certainty == DispatchCertainty.NOT_SENT
+
+
+def test_bounded_final_capture_cannot_be_recorded_as_transport_failure(
+    engine: Engine, seeded_attempt_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+
+    with pytest.raises(AttemptConflict):
+        store.record_transport_failure(
+            attempt.id,
+            lease,
+            outcome=TransportOutcome.RESPONSE_LIMIT_EXCEEDED,
+            certainty=DispatchCertainty.POSSIBLY_SENT,
+        )
+
+
+@pytest.mark.parametrize(
+    ("outcome", "truncated"),
+    [
+        (TransportOutcome.DNS_FAILURE, False),
+        (TransportOutcome.RESPONSE_RECEIVED, True),
+        (TransportOutcome.RESPONSE_LIMIT_EXCEEDED, False),
+    ],
+)
+def test_response_outcome_must_describe_the_bounded_capture(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    outcome: TransportOutcome,
+    truncated: bool,
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    lease = PostgresJobStore(factory, clock=lambda: NOW).claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = store.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    store.checkpoint_dispatch(
+        attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+
+    with pytest.raises(AttemptConflict):
+        store.record_response(
+            attempt.id,
+            lease,
+            ResponseArtifact(
+                attempt.id,
+                200,
+                {},
+                "text",
+                "bounded",
+                7,
+                truncated,
+                False,
+                NOW,
+                NOW + timedelta(days=7),
+            ),
+            outcome=outcome,
+        )
 
 
 def test_replay_successor_can_dispatch_after_predecessor_link(

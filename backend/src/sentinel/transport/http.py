@@ -16,7 +16,12 @@ import httpcore
 from httpcore._backends.base import SOCKET_OPTION
 
 from sentinel.execution.domain import DispatchCertainty, RedirectRejectionCode, TransportOutcome
-from sentinel.execution.ports import TransportResult
+from sentinel.execution.ports import (
+    NO_CANCELLATION,
+    CancellationSignal,
+    DispatchCancelled,
+    TransportResult,
+)
 from sentinel.execution.preparation import PreparationError, PreparedRequest
 from sentinel.security.redaction import redact_observation
 from sentinel.security.targets import (
@@ -186,6 +191,8 @@ class _Observation:
     status_code: int
     headers: dict[str, str]
     body: bytes | None
+    body_kind: str | None
+    body_content: object | None
     source_bytes_captured: int
     truncated: bool
     redaction_unavailable: bool
@@ -215,7 +222,17 @@ class HTTPTransportAdapter:
         self.clock = clock
         self.dns_executor = dns_executor
 
-    def dispatch(self, request: PreparedRequest) -> TransportResult:
+    def dispatch(
+        self,
+        request: PreparedRequest,
+    ) -> TransportResult:
+        return self.dispatch_cancellable(request, NO_CANCELLATION)
+
+    def dispatch_cancellable(
+        self,
+        request: PreparedRequest,
+        cancellation: CancellationSignal,
+    ) -> TransportResult:
         if not request.verify_tls:
             raise PreparationError("tls_verification_required")
         deadline = self.clock() + request.timeout_ms / 1000
@@ -227,6 +244,7 @@ class HTTPTransportAdapter:
         redirects = 0
         last_observation: _Observation | None = None
         while True:
+            cancellation.raise_if_cancelled()
             try:
                 target = resolve_target(
                     current_url,
@@ -272,6 +290,7 @@ class HTTPTransportAdapter:
                 )
 
             try:
+                cancellation.raise_if_cancelled()
                 response, backend = self._send(
                     target,
                     method=method,
@@ -279,7 +298,10 @@ class HTTPTransportAdapter:
                     body=body,
                     request=request,
                     deadline=deadline,
+                    cancellation=cancellation,
                 )
+            except DispatchCancelled:
+                raise
             except _TotalTimeout:
                 return self._failure(
                     TransportOutcome.TOTAL_TIMEOUT,
@@ -345,7 +367,7 @@ class HTTPTransportAdapter:
                 )
 
             try:
-                observation = self._read_observation(response, request, deadline)
+                observation = self._read_observation(response, request, deadline, cancellation)
             except _ReadObservationFailure as error:
                 response.close()
                 return self._failure(
@@ -435,7 +457,9 @@ class HTTPTransportAdapter:
         body: bytes | None,
         request: PreparedRequest,
         deadline: float,
+        cancellation: CancellationSignal = NO_CANCELLATION,
     ) -> tuple[httpcore.Response, _PinnedNetworkBackend]:
+        cancellation.raise_if_cancelled()
         remaining = deadline - self.clock()
         if remaining <= 0:
             raise _TotalTimeout
@@ -477,13 +501,18 @@ class HTTPTransportAdapter:
             extensions={"sni_hostname": target.hostname, "timeout": timeout},
         )
         try:
+            cancellation.raise_if_cancelled()
             return connection.handle_request(http_request), backend
         except Exception:
             connection.close()
             raise
 
     def _read_observation(
-        self, response: httpcore.Response, request: PreparedRequest, deadline: float
+        self,
+        response: httpcore.Response,
+        request: PreparedRequest,
+        deadline: float,
+        cancellation: CancellationSignal = NO_CANCELLATION,
     ) -> _Observation:
         headers = {
             name.decode("latin-1"): value.decode("latin-1") for name, value in response.headers
@@ -492,9 +521,10 @@ class HTTPTransportAdapter:
         truncated = False
         try:
             for chunk in response.iter_stream():
+                cancellation.raise_if_cancelled()
                 if self.clock() >= deadline:
                     raise _ReadObservationFailure(
-                        TransportOutcome.TOTAL_TIMEOUT,
+                        TransportOutcome.READ_TIMEOUT,
                         self._redacted_observation(
                             response, request, bytes(chunks), truncated, headers
                         ),
@@ -509,12 +539,12 @@ class HTTPTransportAdapter:
                     break
                 if self.clock() >= deadline:
                     raise _ReadObservationFailure(
-                        TransportOutcome.TOTAL_TIMEOUT,
+                        TransportOutcome.READ_TIMEOUT,
                         self._redacted_observation(
                             response, request, bytes(chunks), truncated, headers
                         ),
                     )
-        except _ReadObservationFailure:
+        except (_ReadObservationFailure, DispatchCancelled):
             raise
         except httpcore.ReadTimeout:
             raise _ReadObservationFailure(
@@ -567,6 +597,8 @@ class HTTPTransportAdapter:
             status_code=redacted.status_code,
             headers=redacted.headers,
             body=safe_body,
+            body_kind=redacted.body_kind,
+            body_content=redacted.body_content,
             source_bytes_captured=redacted.source_bytes_captured,
             truncated=truncated or redacted.truncated,
             redaction_unavailable=redacted.redaction_unavailable,
@@ -616,6 +648,8 @@ class HTTPTransportAdapter:
             None,
             observation.redaction_unavailable,
             None,
+            observation.body_kind,
+            observation.body_content,
         )
 
     @staticmethod
@@ -638,4 +672,6 @@ class HTTPTransportAdapter:
             redirect_code,
             observation.redaction_unavailable if observation is not None else False,
             not_sent_proof,
+            observation.body_kind if observation is not None else None,
+            observation.body_content if observation is not None else None,
         )

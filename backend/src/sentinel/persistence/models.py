@@ -458,7 +458,7 @@ class TestAttemptRow(Base):
         CheckConstraint(
             "state <> 'response_received' OR (response_recorded_at IS NOT NULL "
             "AND dispatch_certainty = 'response_received' "
-            "AND transport_outcome = 'response_received')",
+            "AND transport_outcome IN ('response_received','response_limit_exceeded'))",
             name="test_attempt_response_shape",
         ),
         CheckConstraint(
@@ -475,12 +475,12 @@ class TestAttemptRow(Base):
         CheckConstraint(
             "(state = 'dispatching' AND dispatch_certainty = 'possibly_sent') OR "
             "(state = 'response_received' AND dispatch_certainty = 'response_received' "
-            "AND transport_outcome = 'response_received') OR "
+            "AND transport_outcome IN ('response_received','response_limit_exceeded')) OR "
             "(state = 'transport_failed' AND ((dispatch_certainty = 'not_sent' AND "
             "transport_outcome IN ('dns_failure','connect_timeout','connection_failure',"
             "'tls_failure','target_denied')) OR (dispatch_certainty = 'possibly_sent' AND "
             "transport_outcome IN ('write_timeout','write_failure','read_timeout','read_failure',"
-            "'total_timeout','indeterminate','response_limit_exceeded')) OR "
+            "'total_timeout','indeterminate')) OR "
             "(dispatch_certainty = 'response_received' AND transport_outcome IN "
             "('redirect_denied','read_timeout','read_failure','dns_failure','connect_timeout',"
             "'connection_failure','tls_failure','target_denied')))) OR "
