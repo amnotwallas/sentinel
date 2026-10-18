@@ -1,4 +1,21 @@
 export interface paths {
+    "/api/v1/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Attempt */
+        get: operations["get_attempt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/environments/{environment_id}": {
         parameters: {
             query?: never;
@@ -233,6 +250,38 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Assertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["HeaderPresentAssertion"] | components["schemas"]["HeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
+        /** AttemptDetail */
+        AttemptDetail: {
+            /** Client Span Id */
+            client_span_id: string | null;
+            created_at: components["schemas"]["Timestamp"];
+            dispatch_certainty: components["schemas"]["DispatchCertainty"];
+            dispatch_recorded_at: components["schemas"]["Timestamp"] | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            execution_id: components["schemas"]["UUID"];
+            execution_item_id: components["schemas"]["UUID"];
+            finished_at: components["schemas"]["Timestamp"] | null;
+            id: components["schemas"]["UUID"];
+            /** Included In Verdict */
+            included_in_verdict: boolean;
+            links: components["schemas"]["RelativeLinks"];
+            observation: components["schemas"]["ResponseObservation"] | null;
+            observation_state: components["schemas"]["ObservationState"];
+            preparation_error_code: components["schemas"]["PreparationErrorCode"] | null;
+            /** Primary Trace Id */
+            primary_trace_id: string | null;
+            redirect_rejection_code: components["schemas"]["RedirectRejectionCode"] | null;
+            replayed_by_attempt_id: components["schemas"]["UUID"] | null;
+            /** Request Fingerprint */
+            request_fingerprint: string | null;
+            response_recorded_at: components["schemas"]["Timestamp"] | null;
+            /** Sequence */
+            sequence: number;
+            state: components["schemas"]["AttemptState"];
+            transport_outcome: components["schemas"]["TransportOutcome"] | null;
+            verdict: components["schemas"]["Verdict"] | null;
+        };
         /**
          * AttemptState
          * @enum {string}
@@ -241,12 +290,12 @@ export interface components {
         /** AttemptSummary */
         AttemptSummary: {
             /** Client Span Id */
-            client_span_id?: string | null;
+            client_span_id: string | null;
             created_at: components["schemas"]["Timestamp"];
             dispatch_certainty: components["schemas"]["DispatchCertainty"];
             dispatch_recorded_at: components["schemas"]["Timestamp"] | null;
             /** Duration Ms */
-            duration_ms?: number | null;
+            duration_ms: number | null;
             finished_at: components["schemas"]["Timestamp"] | null;
             id: components["schemas"]["UUID"];
             /** Included In Verdict */
@@ -254,7 +303,7 @@ export interface components {
             links: components["schemas"]["RelativeLinks"];
             preparation_error_code: components["schemas"]["PreparationErrorCode"] | null;
             /** Primary Trace Id */
-            primary_trace_id?: string | null;
+            primary_trace_id: string | null;
             redirect_rejection_code: components["schemas"]["RedirectRejectionCode"] | null;
             replayed_by_attempt_id: components["schemas"]["UUID"] | null;
             response_recorded_at: components["schemas"]["Timestamp"] | null;
@@ -747,6 +796,11 @@ export interface components {
         /** @description Validate named versioned policy in M2 only. Invalid runtime input yields explicit error;M4 verdict mapping unresolved. */
         Normalizer: components["schemas"]["NoneNormalizer"] | components["schemas"]["SortScalarArrayNormalizer"] | components["schemas"]["RoundDecimalNormalizer"];
         /**
+         * ObservationState
+         * @enum {string}
+         */
+        ObservationState: "not_recorded" | "available" | "expired" | "omitted";
+        /**
          * PreparationErrorCode
          * @enum {string}
          */
@@ -990,6 +1044,36 @@ export interface components {
             name: components["schemas"]["HeaderName"];
             value: string | components["schemas"]["SecretReference"];
         } & (unknown & unknown & unknown);
+        /** ResponseHeader */
+        ResponseHeader: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /** ResponseObservation */
+        ResponseObservation: {
+            /** Body */
+            body: string | null;
+            /**
+             * Body Kind
+             * @enum {string}
+             */
+            body_kind: "json" | "text" | "omitted";
+            /** Captured Bytes */
+            captured_bytes: number;
+            expires_at: components["schemas"]["Timestamp"];
+            /** Headers */
+            headers: components["schemas"]["ResponseHeader"][];
+            id: components["schemas"]["UUID"];
+            recorded_at: components["schemas"]["Timestamp"];
+            /** Redaction Unavailable */
+            redaction_unavailable: boolean;
+            /** Status Code */
+            status_code: number | null;
+            /** Truncated */
+            truncated: boolean;
+        };
         RoundDecimalNormalizer: {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -1209,6 +1293,100 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     get_environment: {
         parameters: {
             query?: never;

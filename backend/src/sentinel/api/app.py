@@ -21,7 +21,7 @@ from sentinel.api.catalog.suite_openapi import suite_schemas
 from sentinel.api.catalog.suites import suite_router
 from sentinel.api.catalog.test_case_openapi import test_case_schemas
 from sentinel.api.catalog.test_cases import test_case_router
-from sentinel.api.executions import execution_router
+from sentinel.api.executions import attempt_router, execution_router
 from sentinel.api.problems import problem, validation_problem
 from sentinel.catalog.environments import EnvironmentService
 from sentinel.catalog.projects import ProjectService
@@ -88,6 +88,8 @@ def _normalize_execution_openapi(schema: dict[str, Any]) -> None:
     id_fields = {
         "ChangeEventOutput": {"id", "project_id", "subject_id", "before_ref", "after_ref"},
         "AttemptSummary": {"id", "replayed_by_attempt_id"},
+        "AttemptDetail": {"id", "execution_id", "execution_item_id", "replayed_by_attempt_id"},
+        "ResponseObservation": {"id"},
         "ExecutionItem": {"id", "test_case_id", "test_case_revision_id"},
         "ExecutionSummary": {
             "id",
@@ -119,11 +121,14 @@ def _normalize_execution_openapi(schema: dict[str, Any]) -> None:
     required_timestamps = {
         "ChangeEventOutput": {"created_at"},
         "AttemptSummary": {"created_at"},
+        "AttemptDetail": {"created_at"},
         "ExecutionSummary": {"created_at"},
         "ExecutionDetail": {"created_at"},
+        "ResponseObservation": {"recorded_at", "expires_at"},
     }
     optional_timestamps = {
         "AttemptSummary": {"dispatch_recorded_at", "response_recorded_at", "finished_at"},
+        "AttemptDetail": {"dispatch_recorded_at", "response_recorded_at", "finished_at"},
         "ExecutionItem": {"started_at", "finished_at"},
         "ExecutionSummary": {"started_at", "finished_at"},
         "ExecutionDetail": {"started_at", "finished_at"},
@@ -243,6 +248,7 @@ def create_app(
         max_deliveries=settings.max_deliveries,
     )
     app.include_router(execution_router(executions))
+    app.include_router(attempt_router(executions))
 
     async def tempo_ready() -> bool:
         try:

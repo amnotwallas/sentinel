@@ -10,6 +10,8 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
+from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
+from sentinel.persistence.attempts import PostgresAttemptStore
 from sentinel.persistence.models import (
     EnvironmentRevisionRow,
     EnvironmentRow,
@@ -18,9 +20,11 @@ from sentinel.persistence.models import (
     IdempotencyRecordRow,
     JobRow,
     ProjectRow,
+    ResponseArtifactRow,
     SuiteRevisionItemRow,
     SuiteRevisionRow,
     SuiteRow,
+    TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
 )
@@ -58,6 +62,17 @@ class ExecutionItemRecord:
     verdict: str | None
     started_at: datetime | None
     finished_at: datetime | None
+    attempts: tuple[AttemptRecord, ...] = ()
+    attempt_count: int = 0
+    attempts_truncated: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptReadRecord:
+    execution_id: UUID
+    attempt: AttemptRecord
+    artifact: ResponseArtifact | None
+    read_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +340,57 @@ class PostgresExecutionService:
         with self.sessions() as session:
             return self._record(session, execution_id)
 
+    def get_attempt(self, attempt_id: UUID) -> AttemptReadRecord | None:
+        """Read one attempt and its already-redacted observation.
+
+        The join keeps an attempt readable only when it belongs to a materialized,
+        non-deleted project execution.  No request document or lease data is read.
+        """
+        with self.sessions() as session:
+            row = session.scalar(
+                select(TestAttemptRow)
+                .join(ExecutionItemRow, ExecutionItemRow.id == TestAttemptRow.execution_item_id)
+                .join(ExecutionRow, ExecutionRow.id == ExecutionItemRow.execution_id)
+                .join(ProjectRow, ProjectRow.id == ExecutionRow.project_id)
+                .where(
+                    TestAttemptRow.id == attempt_id,
+                    ExecutionRow.project_id.is_not(None),
+                    ProjectRow.deleted_at.is_(None),
+                )
+            )
+            if row is None:
+                return None
+            execution_id = session.scalar(
+                select(ExecutionItemRow.execution_id).where(
+                    ExecutionItemRow.id == row.execution_item_id
+                )
+            )
+            if execution_id is None:
+                return None
+            artifact_row = session.get(ResponseArtifactRow, attempt_id)
+            artifact = (
+                ResponseArtifact(
+                    attempt_id=artifact_row.attempt_id,
+                    status_code=artifact_row.status_code,
+                    headers=artifact_row.headers,
+                    body_kind=artifact_row.body_kind,
+                    body_content=artifact_row.body_content,
+                    source_bytes_captured=artifact_row.source_bytes_captured,
+                    truncated=artifact_row.truncated,
+                    redaction_unavailable=artifact_row.redaction_unavailable,
+                    recorded_at=artifact_row.recorded_at,
+                    expires_at=artifact_row.expires_at,
+                )
+                if artifact_row is not None
+                else None
+            )
+            return AttemptReadRecord(
+                execution_id=execution_id,
+                attempt=PostgresAttemptStore._record(row),
+                artifact=artifact,
+                read_at=self._now(session),
+            )
+
     def list(
         self,
         *,
@@ -386,7 +452,9 @@ class PostgresExecutionService:
                 )
             )
             has_more = len(rows) > limit
-            records = tuple(self._record(session, row.id) for row in rows[:limit])
+            records = tuple(
+                self._record(session, row.id, include_attempts=False) for row in rows[:limit]
+            )
             if any(record is None for record in records):
                 raise ExecutionInfrastructureError("execution_read_failed")
             return ExecutionPageRecord(
@@ -395,9 +463,14 @@ class PostgresExecutionService:
             )
 
     @staticmethod
-    def _record(session: Session, execution_id: UUID) -> ExecutionRecord | None:
+    def _record(
+        session: Session, execution_id: UUID, *, include_attempts: bool = True
+    ) -> ExecutionRecord | None:
         execution = session.get(ExecutionRow, execution_id)
         if execution is None or execution.project_id is None:
+            return None
+        project = session.get(ProjectRow, execution.project_id)
+        if project is None or project.deleted_at is not None:
             return None
         if (
             execution.environment_id is None
@@ -407,24 +480,61 @@ class PostgresExecutionService:
             or execution.source_revision_id is None
         ):
             return None
-        items = tuple(
-            ExecutionItemRecord(
-                id=row.id,
-                ordinal=row.ordinal,
-                test_case_id=row.test_case_id,
-                test_case_revision_id=row.test_case_revision_id,
-                test_case_revision_version=row.test_case_revision_version,
-                status=row.status,
-                verdict=row.verdict,
-                started_at=row.started_at,
-                finished_at=row.finished_at,
+        items: list[ExecutionItemRecord] = []
+        for row in session.scalars(
+            select(ExecutionItemRow)
+            .where(ExecutionItemRow.execution_id == execution.id)
+            .order_by(ExecutionItemRow.ordinal)
+        ):
+            attempt_records: tuple[AttemptRecord, ...] = ()
+            attempt_count = 0
+            attempts_truncated = False
+            if include_attempts:
+                attempt_count = int(
+                    session.scalar(
+                        select(func.count(TestAttemptRow.id)).where(
+                            TestAttemptRow.execution_item_id == row.id
+                        )
+                    )
+                    or 0
+                )
+                attempts_truncated = attempt_count > 100
+                attempt_statement = select(TestAttemptRow).where(
+                    TestAttemptRow.execution_item_id == row.id
+                )
+                if attempts_truncated:
+                    attempt_statement = attempt_statement.order_by(
+                        TestAttemptRow.sequence.desc(), TestAttemptRow.id.desc()
+                    ).limit(100)
+                    attempt_rows = list(session.scalars(attempt_statement))
+                    attempt_rows.reverse()
+                else:
+                    attempt_rows = list(
+                        session.scalars(
+                            attempt_statement.order_by(
+                                TestAttemptRow.sequence, TestAttemptRow.id
+                            ).limit(100)
+                        )
+                    )
+                attempt_records = tuple(
+                    PostgresAttemptStore._record(attempt_row) for attempt_row in attempt_rows
+                )
+            items.append(
+                ExecutionItemRecord(
+                    id=row.id,
+                    ordinal=row.ordinal,
+                    test_case_id=row.test_case_id,
+                    test_case_revision_id=row.test_case_revision_id,
+                    test_case_revision_version=row.test_case_revision_version,
+                    status=row.status,
+                    verdict=row.verdict,
+                    started_at=row.started_at,
+                    finished_at=row.finished_at,
+                    attempts=attempt_records,
+                    attempt_count=attempt_count,
+                    attempts_truncated=attempts_truncated,
+                )
             )
-            for row in session.scalars(
-                select(ExecutionItemRow)
-                .where(ExecutionItemRow.execution_id == execution.id)
-                .order_by(ExecutionItemRow.ordinal)
-            )
-        )
         return ExecutionRecord(
             id=execution.id,
             project_id=execution.project_id,
@@ -438,5 +548,5 @@ class PostgresExecutionService:
             created_at=execution.created_at,
             started_at=execution.started_at,
             finished_at=execution.finished_at,
-            items=items,
+            items=tuple(items),
         )

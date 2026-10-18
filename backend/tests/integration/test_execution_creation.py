@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -24,9 +24,11 @@ from sentinel.persistence.models import (
     IdempotencyRecordRow,
     JobRow,
     ProjectRow,
+    ResponseArtifactRow,
     SuiteRevisionItemRow,
     SuiteRevisionRow,
     SuiteRow,
+    TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
 )
@@ -205,6 +207,116 @@ def test_creation_is_atomic_and_enqueues_compatible_job(
         job = session.scalar(select(JobRow).where(JobRow.subject_id == record.id))
     assert item is not None and item.test_case_revision_id == TEST_CASE_REVISION_ID
     assert job is not None and job.kind == "execute_execution" and job.state == "pending"
+
+
+@pytest.mark.integration
+def test_execution_read_includes_ordered_attempt_history_and_expiry(
+    engine: Engine, execution_service: PostgresExecutionService, seeded_catalog: None
+) -> None:
+    record = execution_service.create(
+        ExecutionCreateCommand(ENVIRONMENT_ID, test_case_id=TEST_CASE_ID)
+    )
+    item_id = record.items[0].id
+    attempt_id = UUID("10000000-0000-4000-8000-000000000090")
+    with Session(engine) as session:
+        session.add(
+            TestAttemptRow(
+                id=attempt_id,
+                execution_item_id=item_id,
+                sequence=1,
+                state="response_received",
+                dispatch_certainty="response_received",
+                request_fingerprint="a" * 64,
+                created_at=NOW,
+                dispatch_recorded_at=NOW,
+                response_recorded_at=NOW,
+                finished_at=NOW,
+                duration_ms=12,
+                transport_outcome="response_received",
+                preparation_error_code=None,
+                redirect_rejection_code=None,
+                replay_successor_id=None,
+                primary_trace_id="b" * 32,
+                client_span_id="c" * 16,
+                included_in_verdict=True,
+            )
+        )
+        session.flush()
+        session.add(
+            ResponseArtifactRow(
+                attempt_id=attempt_id,
+                status_code=200,
+                headers={"content-type": "application/json", "authorization": "[REDACTED]"},
+                body_kind="json",
+                body_content={"ok": True},
+                source_bytes_captured=11,
+                truncated=False,
+                redaction_unavailable=False,
+                recorded_at=NOW,
+                expires_at=NOW + timedelta(days=7),
+            )
+        )
+        session.commit()
+
+    detail = execution_service.get(record.id)
+    assert detail is not None
+    assert len(detail.items) == 1
+    assert [attempt.sequence for attempt in detail.items[0].attempts] == [1]
+    read = execution_service.get_attempt(attempt_id)
+    assert read is not None
+    assert read.execution_id == record.id
+    assert read.artifact is not None and read.artifact.body_content == {"ok": True}
+
+    with Session(engine) as session:
+        artifact = session.get(ResponseArtifactRow, attempt_id)
+        assert artifact is not None
+        artifact.expires_at = NOW - timedelta(seconds=1)
+        session.commit()
+    expired = execution_service.get_attempt(attempt_id)
+    assert expired is not None and expired.artifact is not None
+    assert expired.artifact.expires_at < expired.read_at
+
+
+@pytest.mark.integration
+def test_execution_read_bounds_attempt_history_to_latest_hundred(
+    execution_service: PostgresExecutionService, seeded_catalog: None
+) -> None:
+    record = execution_service.create(
+        ExecutionCreateCommand(ENVIRONMENT_ID, test_case_id=TEST_CASE_ID)
+    )
+    item_id = record.items[0].id
+    with execution_service.sessions.begin() as session:
+        session.add_all(
+            [
+                TestAttemptRow(
+                    id=UUID(int=10_000 + sequence),
+                    execution_item_id=item_id,
+                    sequence=sequence,
+                    state="prepared",
+                    dispatch_certainty="not_started",
+                    request_fingerprint=None,
+                    created_at=NOW,
+                    dispatch_recorded_at=None,
+                    response_recorded_at=None,
+                    finished_at=None,
+                    duration_ms=None,
+                    transport_outcome=None,
+                    preparation_error_code=None,
+                    redirect_rejection_code=None,
+                    replay_successor_id=None,
+                    primary_trace_id=None,
+                    client_span_id=None,
+                    included_in_verdict=True,
+                )
+                for sequence in range(1, 102)
+            ]
+        )
+    detail = execution_service.get(record.id)
+    assert detail is not None
+    item = detail.items[0]
+    assert item.attempt_count == 101
+    assert item.attempts_truncated is True
+    assert [attempt.sequence for attempt in item.attempts] == list(range(2, 102))
 
 
 @pytest.mark.integration

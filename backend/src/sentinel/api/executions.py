@@ -23,7 +23,9 @@ from pydantic.json_schema import SkipJsonSchema
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from sentinel.api.problems import Problem, field_problem, problem
+from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
 from sentinel.execution.creation import (
+    AttemptReadRecord,
     ExecutionCreateCommand,
     ExecutionIdempotencyConflict,
     ExecutionInfrastructureError,
@@ -32,6 +34,7 @@ from sentinel.execution.creation import (
     ExecutionValidationError,
     PostgresExecutionService,
 )
+from sentinel.regression.policy import canonical_json
 
 _UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 _IDEMPOTENCY_PATTERN = re.compile(r"^[\x21-\x7e]{1,128}$")
@@ -130,6 +133,13 @@ class RedirectRejectionCode(StrEnum):
     REDIRECT_LIMIT_EXCEEDED = "redirect_limit_exceeded"
 
 
+class ObservationState(StrEnum):
+    NOT_RECORDED = "not_recorded"
+    AVAILABLE = "available"
+    EXPIRED = "expired"
+    OMITTED = "omitted"
+
+
 def _timestamp(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -143,6 +153,8 @@ class TimestampModel(BaseModel):
         "finished_at",
         "dispatch_recorded_at",
         "response_recorded_at",
+        "recorded_at",
+        "expires_at",
         when_used="unless-none",
         check_fields=False,
     )
@@ -251,16 +263,52 @@ class AttemptSummary(TimestampModel):
     dispatch_recorded_at: datetime | None
     response_recorded_at: datetime | None
     finished_at: datetime | None
-    duration_ms: int | None = Field(default=None, ge=0)
+    duration_ms: int | None = Field(ge=0)
     dispatch_certainty: DispatchCertainty
     transport_outcome: TransportOutcome | None
     preparation_error_code: PreparationErrorCode | None
     redirect_rejection_code: RedirectRejectionCode | None
-    primary_trace_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
-    client_span_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+    primary_trace_id: str | None = Field(pattern=r"^[0-9a-f]{32}$")
+    client_span_id: str | None = Field(pattern=r"^[0-9a-f]{16}$")
     replayed_by_attempt_id: UUID | None
     included_in_verdict: bool
     links: RelativeLinks
+
+
+class ResponseHeader(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        min_length=1,
+        max_length=256,
+        pattern=r"^[!#$%&'*+.^_`|~0-9a-z-]+$",
+    )
+    value: str = Field(max_length=8192, pattern=r"^[^\x00\r\n]*$")
+
+
+class ResponseObservation(TimestampModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    status_code: int | None = Field(ge=100, le=599)
+    headers: list[ResponseHeader] = Field(max_length=64)
+    body_kind: Literal["json", "text", "omitted"]
+    body: str | None = Field(max_length=1_048_576)
+    captured_bytes: int = Field(ge=0, le=1_048_576)
+    truncated: bool
+    redaction_unavailable: bool
+    recorded_at: datetime
+    expires_at: datetime
+
+
+class AttemptDetail(AttemptSummary):
+    model_config = ConfigDict(extra="forbid")
+
+    execution_id: UUID
+    execution_item_id: UUID
+    request_fingerprint: str | None = Field(pattern=r"^[0-9a-f]{64}$")
+    observation: ResponseObservation | None
+    observation_state: ObservationState
 
 
 class ExecutionItem(TimestampModel):
@@ -447,6 +495,124 @@ def _summary(record: ExecutionRecord) -> ExecutionSummary:
     )
 
 
+def _attempt_summary(attempt: AttemptRecord) -> AttemptSummary:
+    return AttemptSummary(
+        id=attempt.id,
+        sequence=attempt.sequence,
+        state=cast(AttemptState, attempt.state),
+        verdict=None,
+        created_at=attempt.created_at,
+        dispatch_recorded_at=attempt.dispatch_recorded_at,
+        response_recorded_at=attempt.response_recorded_at,
+        finished_at=attempt.finished_at,
+        duration_ms=attempt.duration_ms,
+        dispatch_certainty=cast(DispatchCertainty, attempt.dispatch_certainty),
+        transport_outcome=cast(TransportOutcome | None, attempt.transport_outcome),
+        preparation_error_code=cast(PreparationErrorCode | None, attempt.preparation_error_code),
+        redirect_rejection_code=cast(RedirectRejectionCode | None, attempt.redirect_rejection_code),
+        primary_trace_id=attempt.primary_trace_id,
+        client_span_id=attempt.client_span_id,
+        replayed_by_attempt_id=attempt.replay_successor_id,
+        included_in_verdict=attempt.included_in_verdict,
+        links=RelativeLinks(self=f"/api/v1/attempts/{attempt.id}"),
+    )
+
+
+_SENSITIVE_RESPONSE_HEADERS = frozenset(
+    {
+        "authorization",
+        "proxy-authorization",
+        "cookie",
+        "set-cookie",
+        "location",
+        "x-api-key",
+        "x-api-key-secret",
+    }
+)
+
+
+def _response_observation(
+    artifact: ResponseArtifact | None, *, now: datetime
+) -> tuple[ResponseObservation | None, ObservationState]:
+    if artifact is None:
+        return None, ObservationState.NOT_RECORDED
+    if artifact.expires_at <= now:
+        return None, ObservationState.EXPIRED
+
+    safe_headers: list[ResponseHeader] = []
+    aggregate_bytes = 0
+    for raw_name, raw_value in sorted(artifact.headers.items()):
+        if not isinstance(raw_name, str) or not isinstance(raw_value, str):
+            continue
+        name = raw_name.lower()
+        value = "[REDACTED]" if name in _SENSITIVE_RESPONSE_HEADERS else raw_value[:8192]
+        if not re.fullmatch(r"[!#$%&'*+.^_`|~0-9a-z-]+", name):
+            continue
+        if "\x00" in value or "\r" in value or "\n" in value:
+            continue
+        entry_bytes = len(name.encode()) + len(value.encode())
+        if aggregate_bytes + entry_bytes > 32_768 or len(safe_headers) >= 64:
+            break
+        safe_headers.append(ResponseHeader(name=name, value=value))
+        aggregate_bytes += entry_bytes
+
+    body_kind: Literal["json", "text", "omitted"] = "omitted"
+    body: str | None = None
+    omitted = artifact.redaction_unavailable or artifact.body_kind not in {"json", "text"}
+    conversion_failed = False
+    if not omitted and artifact.body_content is not None:
+        try:
+            if artifact.body_kind == "json":
+                body = canonical_json(artifact.body_content)
+            elif isinstance(artifact.body_content, str):
+                body = artifact.body_content
+            else:
+                omitted = True
+        except (TypeError, ValueError):
+            omitted = True
+            conversion_failed = True
+        if body is not None and len(body.encode("utf-8")) > 1_048_576:
+            omitted = True
+            conversion_failed = True
+    if not omitted and body is not None:
+        body_kind = "json" if artifact.body_kind == "json" else "text"
+        state = ObservationState.AVAILABLE
+    else:
+        body = None
+        state = ObservationState.OMITTED
+    return (
+        ResponseObservation(
+            id=artifact.attempt_id,
+            status_code=artifact.status_code,
+            headers=safe_headers,
+            body_kind=body_kind,
+            body=body,
+            captured_bytes=min(artifact.source_bytes_captured, 1_048_576),
+            truncated=artifact.truncated,
+            redaction_unavailable=artifact.redaction_unavailable or conversion_failed,
+            recorded_at=artifact.recorded_at,
+            expires_at=artifact.expires_at,
+        ),
+        state,
+    )
+
+
+def _attempt_detail(record: AttemptReadRecord) -> AttemptDetail:
+    observation, observation_state = _response_observation(record.artifact, now=record.read_at)
+    attempt = record.attempt
+    if record.artifact is None and attempt.response_recorded_at is not None:
+        observation_state = ObservationState.OMITTED
+    summary = _attempt_summary(attempt)
+    return AttemptDetail(
+        **summary.model_dump(),
+        execution_id=record.execution_id,
+        execution_item_id=attempt.execution_item_id,
+        request_fingerprint=attempt.request_fingerprint,
+        observation=observation,
+        observation_state=observation_state,
+    )
+
+
 def _detail(record: ExecutionRecord) -> ExecutionDetail:
     return ExecutionDetail(
         **_summary(record).model_dump(),
@@ -461,9 +627,9 @@ def _detail(record: ExecutionRecord) -> ExecutionDetail:
                 verdict=cast(Verdict | None, item.verdict),
                 started_at=item.started_at,
                 finished_at=item.finished_at,
-                attempts=[],
-                attempts_truncated=False,
-                attempt_count=0,
+                attempts=[_attempt_summary(attempt) for attempt in item.attempts],
+                attempts_truncated=item.attempts_truncated,
+                attempt_count=item.attempt_count,
             )
             for item in record.items
         ],
@@ -622,5 +788,35 @@ def execution_router(service: PostgresExecutionService) -> APIRouter:
         if record is None:
             return problem(404, "resource_not_found", "Request failed")
         return _detail(record)
+
+    return router
+
+
+def attempt_router(service: PostgresExecutionService) -> APIRouter:
+    router = APIRouter(prefix="/api/v1/attempts", tags=["attempts"])
+
+    @router.get(
+        "/{attempt_id}",
+        response_model=AttemptDetail,
+        operation_id="get_attempt",
+        responses=_PROBLEMS,
+    )
+    def get_attempt(
+        attempt_id: Annotated[str, Path(pattern=_UUID_PATTERN)],
+    ) -> AttemptDetail | Response:
+        parsed = UUID(attempt_id)
+        if parsed.int == 0 or str(parsed) != attempt_id:
+            return field_problem(
+                422,
+                "validation_failed",
+                "Request validation failed",
+                location="path",
+                pointer="/attempt_id",
+                field_code="invalid_uuid",
+            )
+        record = service.get_attempt(parsed)
+        if record is None:
+            return problem(404, "resource_not_found", "Request failed")
+        return _attempt_detail(record)
 
     return router

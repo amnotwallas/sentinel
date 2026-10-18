@@ -148,6 +148,7 @@ async def test_openapi_publishes_execution_routes_and_closed_enums(
     document = (await http_client.get("/openapi.json")).json()
     assert set(document["paths"]["/api/v1/executions"]) == {"get", "post"}
     assert "/api/v1/executions/{execution_id}" in document["paths"]
+    assert "/api/v1/attempts/{attempt_id}" in document["paths"]
     assert document["components"]["schemas"]["ExecutionStatus"]["enum"] == [
         "queued",
         "running",
@@ -176,6 +177,15 @@ async def test_openapi_publishes_execution_routes_and_closed_enums(
     assert schemas["ExecutionCreateSuite"]["properties"]["suite_id"] == {
         "$ref": "#/components/schemas/UUID"
     }
+    assert schemas["AttemptDetail"]["properties"]["execution_id"] == {
+        "$ref": "#/components/schemas/UUID"
+    }
+    assert schemas["ObservationState"]["enum"] == [
+        "not_recorded",
+        "available",
+        "expired",
+        "omitted",
+    ]
 
 
 async def test_list_accepts_uuid_filters_and_rejects_conflicting_sources(
