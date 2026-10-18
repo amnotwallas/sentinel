@@ -8,6 +8,22 @@ permissions:
 
 jobs:
   backend:
+    name: Backend and PostgreSQL
+    outputs:
+      test_status: ${{ steps.backend_report.outputs.test_status }}
+      test_total: ${{ steps.backend_report.outputs.test_total }}
+      test_passed: ${{ steps.backend_report.outputs.test_passed }}
+      test_failed: ${{ steps.backend_report.outputs.test_failed }}
+      test_skipped: ${{ steps.backend_report.outputs.test_skipped }}
+      test_duration: ${{ steps.backend_report.outputs.test_duration }}
+      unit_total: ${{ steps.backend_report.outputs.unit_total }}
+      unit_passed: ${{ steps.backend_report.outputs.unit_passed }}
+      unit_failed: ${{ steps.backend_report.outputs.unit_failed }}
+      unit_skipped: ${{ steps.backend_report.outputs.unit_skipped }}
+      postgres_total: ${{ steps.backend_report.outputs.postgres_total }}
+      postgres_passed: ${{ steps.backend_report.outputs.postgres_passed }}
+      postgres_failed: ${{ steps.backend_report.outputs.postgres_failed }}
+      postgres_skipped: ${{ steps.backend_report.outputs.postgres_skipped }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -29,20 +45,168 @@ jobs:
         with:
           version: "0.9.7"
       - run: uv sync --project backend --frozen
-      - run: uv run --project backend ruff check backend
-      - run: uv run --project backend ruff format --check backend
-      - run: uv run mypy
+      - name: Ruff lint
+        id: backend_ruff
+        run: uv run --project backend ruff check backend
+      - name: Ruff format
+        id: backend_format
+        run: uv run --project backend ruff format --check backend
+      - name: Strict mypy
+        id: backend_mypy
+        run: uv run mypy
         working-directory: backend
-      - run: uv run --project backend alembic -c backend/alembic.ini upgrade head
-      - run: uv run --project backend alembic -c backend/alembic.ini check
-      - run: uv run --project backend pytest backend/tests
+      - name: Apply migrations
+        id: backend_migrate_up
+        run: uv run --project backend alembic -c backend/alembic.ini upgrade head
+      - name: Verify schema drift
+        id: backend_schema_check
+        run: uv run --project backend alembic -c backend/alembic.ini check
+      - name: Backend and PostgreSQL tests
+        id: backend_tests
+        run: uv run --project backend pytest backend/tests --junitxml="$RUNNER_TEMP/backend-pytest.xml"
       - name: Verify migration downgrade and re-upgrade (disposable database)
+        id: backend_migration_roundtrip
         run: |
           uv run --project backend alembic -c backend/alembic.ini downgrade base
           uv run --project backend alembic -c backend/alembic.ini upgrade head
           uv run --project backend alembic -c backend/alembic.ini check
+      - name: Publish backend summary
+        id: backend_report
+        if: always()
+        env:
+          RUFF: ${{ steps.backend_ruff.outcome }}
+          FORMAT: ${{ steps.backend_format.outcome }}
+          MYPY: ${{ steps.backend_mypy.outcome }}
+          MIGRATE_UP: ${{ steps.backend_migrate_up.outcome }}
+          SCHEMA_CHECK: ${{ steps.backend_schema_check.outcome }}
+          TEST_STEP: ${{ steps.backend_tests.outcome }}
+          MIGRATION_ROUNDTRIP: ${{ steps.backend_migration_roundtrip.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          def raw_outcome(name: str) -> str:
+              return os.environ.get(name) or "unavailable"
+
+          def outcome(name: str) -> str:
+              return {
+                  "success": "passed",
+                  "failure": "failed",
+                  "skipped": "skipped",
+                  "cancelled": "cancelled",
+              }.get(raw_outcome(name), "unavailable")
+
+          total = passed = failed = skipped = 0
+          unit_total = unit_passed = unit_failed = unit_skipped = 0
+          postgres_total = postgres_passed = postgres_failed = postgres_skipped = 0
+          duration = "unavailable"
+          test_status = "unavailable"
+          test_step = raw_outcome("TEST_STEP")
+          report = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "backend-pytest.xml"
+          try:
+              root = ET.parse(report).getroot()
+              suites = root.findall(".//testsuite")
+              total = sum(int(s.attrib.get("tests", "0")) for s in suites)
+              failed = sum(int(s.attrib.get("failures", "0")) for s in suites)
+              failed += sum(int(s.attrib.get("errors", "0")) for s in suites)
+              skipped = sum(int(s.attrib.get("skipped", "0")) for s in suites)
+              passed = max(total - failed - skipped, 0)
+              cases = root.findall(".//testcase")
+              integration_cases = [
+                  case
+                  for case in cases
+                  if ".integration." in case.attrib.get("classname", "")
+              ]
+              if cases:
+                  postgres_total = len(integration_cases)
+                  postgres_failed = sum(
+                      1
+                      for case in integration_cases
+                      if case.find("failure") is not None or case.find("error") is not None
+                  )
+                  postgres_skipped = sum(
+                      1 for case in integration_cases if case.find("skipped") is not None
+                  )
+                  postgres_passed = max(postgres_total - postgres_failed - postgres_skipped, 0)
+                  unit_total = total - postgres_total
+                  unit_failed = failed - postgres_failed
+                  unit_skipped = skipped - postgres_skipped
+                  unit_passed = max(unit_total - unit_failed - unit_skipped, 0)
+              else:
+                  unit_total = unit_passed = unit_failed = unit_skipped = None
+                  postgres_total = postgres_passed = postgres_failed = postgres_skipped = None
+              duration_value = sum(float(s.attrib.get("time", "0")) for s in suites)
+              duration = f"{duration_value:.2f}s"
+              if test_step == "success":
+                  test_status = "failed" if failed else "passed"
+              elif test_step in {"failure", "cancelled"}:
+                  test_status = "failed" if test_step == "failure" else "cancelled"
+          except (OSError, ET.ParseError, TypeError, ValueError):
+              if test_step in {"failure", "cancelled"}:
+                  test_status = "failed" if test_step == "failure" else "cancelled"
+
+          if test_step not in {"success", "failure", "cancelled"}:
+              test_status = "unavailable"
+          if test_status == "unavailable":
+              total = passed = failed = skipped = 0
+              unit_total = unit_passed = unit_failed = unit_skipped = 0
+              postgres_total = postgres_passed = postgres_failed = postgres_skipped = 0
+              duration = "unavailable"
+
+          outputs = {
+              "test_status": test_status,
+              "test_total": str(total),
+              "test_passed": str(passed),
+              "test_failed": str(failed),
+              "test_skipped": str(skipped),
+              "test_duration": duration,
+              "unit_total": "" if unit_total is None else str(unit_total),
+              "unit_passed": "" if unit_passed is None else str(unit_passed),
+              "unit_failed": "" if unit_failed is None else str(unit_failed),
+              "unit_skipped": "" if unit_skipped is None else str(unit_skipped),
+              "postgres_total": "" if postgres_total is None else str(postgres_total),
+              "postgres_passed": "" if postgres_passed is None else str(postgres_passed),
+              "postgres_failed": "" if postgres_failed is None else str(postgres_failed),
+              "postgres_skipped": "" if postgres_skipped is None else str(postgres_skipped),
+          }
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              for key, value in outputs.items():
+                  stream.write(f"{key}={value}\n")
+
+          lines = [
+              "## Backend and PostgreSQL",
+              "",
+              "| Check | Result |",
+              "| --- | --- |",
+              f"| Ruff lint | {outcome('RUFF')} |",
+              f"| Ruff format | {outcome('FORMAT')} |",
+              f"| Strict mypy | {outcome('MYPY')} |",
+              f"| Migration upgrade | {outcome('MIGRATE_UP')} |",
+              f"| Schema drift | {outcome('SCHEMA_CHECK')} |",
+              f"| Aggregate tests | {test_status}: {passed}/{total} passed; {failed} failed; {skipped} skipped ({duration}) |",
+              f"| Backend unit/contract tests | {test_status}: {unit_passed}/{unit_total} passed; {unit_failed} failed; {unit_skipped} skipped |" if unit_total is not None else "| Backend unit/contract tests | unavailable (JUnit report has no testcase breakdown) |",
+              f"| PostgreSQL integration tests | {test_status}: {postgres_passed}/{postgres_total} passed; {postgres_failed} failed; {postgres_skipped} skipped |" if postgres_total is not None else "| PostgreSQL integration tests | unavailable (JUnit report has no testcase breakdown) |",
+              f"| Migration downgrade/re-upgrade | {outcome('MIGRATION_ROUNDTRIP')} |",
+              "",
+              "[Open workflow logs for backend diagnostics](%s/%s/actions/runs/%s)"
+              % (os.environ.get("GITHUB_SERVER_URL", "https://github.com"), os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_RUN_ID"]),
+              "",
+          ]
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines))
+          PY
 
   frontend:
+    name: Frontend and Contracts
+    outputs:
+      test_status: ${{ steps.frontend_report.outputs.test_status }}
+      test_total: ${{ steps.frontend_report.outputs.test_total }}
+      test_passed: ${{ steps.frontend_report.outputs.test_passed }}
+      test_failed: ${{ steps.frontend_report.outputs.test_failed }}
+      test_skipped: ${{ steps.frontend_report.outputs.test_skipped }}
+      test_duration: ${{ steps.frontend_report.outputs.test_duration }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,36 +224,318 @@ jobs:
       - run: uv sync --project ../backend --frozen
       - run: npm ci
       - name: Verify OpenAPI and generated client drift
+        id: frontend_contract
         run: |
           ../backend/.venv/bin/python -m sentinel.api.export openapi.json
           npm run api:generate
           git diff --exit-code -- openapi.json src/shared/api/generated/schema.ts
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: ESLint
+        id: frontend_eslint
+        run: npm run lint
+      - name: Prettier
+        id: frontend_prettier
+        run: npm run format:check
+      - name: TypeScript
+        id: frontend_typescript
+        run: npm run typecheck
+      - name: Vitest
+        id: frontend_tests
+        shell: bash
+        run: |
+          start=$(date +%s)
+          trap 'status=$?; end=$(date +%s); echo "duration_seconds=$((end-start))" >> "$GITHUB_OUTPUT"; trap - EXIT; exit "$status"' EXIT
+          npm test -- --reporter=json --outputFile="$RUNNER_TEMP/frontend-vitest.json"
+      - name: Production build
+        id: frontend_build
+        run: npm run build
+      - name: Publish frontend summary
+        id: frontend_report
+        if: always()
+        env:
+          CONTRACT: ${{ steps.frontend_contract.outcome }}
+          ESLINT: ${{ steps.frontend_eslint.outcome }}
+          PRETTIER: ${{ steps.frontend_prettier.outcome }}
+          TYPESCRIPT: ${{ steps.frontend_typescript.outcome }}
+          TEST_STEP: ${{ steps.frontend_tests.outcome }}
+          TEST_DURATION: ${{ steps.frontend_tests.outputs.duration_seconds }}
+          BUILD: ${{ steps.frontend_build.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def raw_outcome(name: str) -> str:
+              return os.environ.get(name) or "unavailable"
+
+          def outcome(name: str) -> str:
+              return {
+                  "success": "passed",
+                  "failure": "failed",
+                  "skipped": "skipped",
+                  "cancelled": "cancelled",
+              }.get(raw_outcome(name), "unavailable")
+
+          total = passed = failed = skipped = 0
+          test_status = "unavailable"
+          duration = os.environ.get("TEST_DURATION") or "unavailable"
+          test_step = raw_outcome("TEST_STEP")
+          report = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "frontend-vitest.json"
+          try:
+              data = json.loads(report.read_text(encoding="utf-8"))
+              total = int(data.get("numTotalTests", 0))
+              passed = int(data.get("numPassedTests", 0))
+              failed = int(data.get("numFailedTests", 0))
+              skipped = int(data.get("numPendingTests", 0)) + int(data.get("numTodoTests", 0))
+              if test_step == "success":
+                  test_status = "passed" if data.get("success") is True and failed == 0 else "failed"
+              elif test_step in {"failure", "cancelled"}:
+                  test_status = "failed" if test_step == "failure" else "cancelled"
+          except (OSError, ValueError, TypeError, json.JSONDecodeError):
+              if test_step in {"failure", "cancelled"}:
+                  test_status = "failed" if test_step == "failure" else "cancelled"
+
+          if test_step not in {"success", "failure", "cancelled"}:
+              test_status = "unavailable"
+          if test_status == "unavailable":
+              total = passed = failed = skipped = 0
+              duration = "unavailable"
+
+          outputs = {
+              "test_status": test_status,
+              "test_total": str(total),
+              "test_passed": str(passed),
+              "test_failed": str(failed),
+              "test_skipped": str(skipped),
+              "test_duration": duration,
+          }
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              for key, value in outputs.items():
+                  stream.write(f"{key}={value}\n")
+
+          lines = [
+              "## Frontend and Contracts",
+              "",
+              "| Check | Result |",
+              "| --- | --- |",
+              f"| OpenAPI/generated TypeScript drift | {outcome('CONTRACT')} |",
+              f"| ESLint | {outcome('ESLINT')} |",
+              f"| Prettier | {outcome('PRETTIER')} |",
+              f"| TypeScript | {outcome('TYPESCRIPT')} |",
+              f"| Vitest | {test_status}: {passed}/{total} passed; {failed} failed; {skipped} skipped ({duration}) |",
+              f"| Production build | {outcome('BUILD')} |",
+              "| Planned contract validation | unavailable (not configured in this workflow) |",
+              "| Tooling checks | unavailable (not configured in this workflow) |",
+              "",
+              "[Open workflow logs for frontend diagnostics](%s/%s/actions/runs/%s)"
+              % (os.environ.get("GITHUB_SERVER_URL", "https://github.com"), os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_RUN_ID"]),
+              "",
+          ]
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines))
+          PY
 
   compose:
+    name: Docker Compose
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: compose-ci-only
       SENTINEL_API_TOKEN: compose-ci-only-token
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose -f infra/compose.yaml config --quiet
-      - run: docker compose -f infra/compose.yaml config --format json | python3 infra/check_bindings.py
-      - run: docker compose -f infra/compose.yaml up -d --wait postgres
-      - run: docker compose -f infra/compose.yaml run --build --rm api alembic upgrade head
-      - run: docker compose -f infra/compose.yaml up -d --build --wait --wait-timeout 180
-      - run: docker compose -f infra/compose.yaml exec -T api python -m sentinel.worker.smoke
+      - name: Validate Compose configuration
+        id: compose_config
+        run: docker compose -f infra/compose.yaml config --quiet
+      - name: Validate loopback network bindings
+        id: compose_bindings
+        run: docker compose -f infra/compose.yaml config --format json | python3 infra/check_bindings.py
+      - name: Start PostgreSQL and wait for readiness
+        id: compose_postgres
+        run: docker compose -f infra/compose.yaml up -d --wait postgres
+      - name: Apply migrations in the packaged API
+        id: compose_migrate
+        run: docker compose -f infra/compose.yaml run --build --rm api alembic upgrade head
+      - name: Build and start the disposable stack
+        id: compose_startup
+        shell: bash
+        run: |
+          start=$(date +%s)
+          trap 'status=$?; end=$(date +%s); echo "duration_seconds=$((end-start))" >> "$GITHUB_OUTPUT"; trap - EXIT; exit "$status"' EXIT
+          docker compose -f infra/compose.yaml up -d --build --wait --wait-timeout 180
+      - name: Worker smoke test
+        id: compose_worker
+        run: docker compose -f infra/compose.yaml exec -T api python -m sentinel.worker.smoke
       - name: Verify Tempo outage does not remove API readiness
+        id: compose_tempo
         run: |
           docker compose -f infra/compose.yaml stop tempo
           python3 -c "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health/ready')); assert r['status']=='ready' and r['tempo']=='unavailable'"
+      - name: Publish Compose summary
+        id: compose_report
+        if: always()
+        env:
+          CONFIG: ${{ steps.compose_config.outcome }}
+          BINDINGS: ${{ steps.compose_bindings.outcome }}
+          POSTGRES: ${{ steps.compose_postgres.outcome }}
+          MIGRATE: ${{ steps.compose_migrate.outcome }}
+          STARTUP: ${{ steps.compose_startup.outcome }}
+          STARTUP_DURATION: ${{ steps.compose_startup.outputs.duration_seconds }}
+          WORKER: ${{ steps.compose_worker.outcome }}
+          TEMPO: ${{ steps.compose_tempo.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          def outcome(name: str) -> str:
+              return {
+                  "success": "passed",
+                  "failure": "failed",
+                  "skipped": "skipped",
+                  "cancelled": "cancelled",
+              }.get(os.environ.get(name) or "unavailable", "unavailable")
+
+          lines = [
+              "## Docker Compose",
+              "",
+              "| Check | Result |",
+              "| --- | --- |",
+              f"| Configuration | {outcome('CONFIG')} |",
+              f"| Loopback network bindings | {outcome('BINDINGS')} |",
+              f"| PostgreSQL readiness | {outcome('POSTGRES')} |",
+              f"| Packaged API migration | {outcome('MIGRATE')} |",
+              f"| Container build/startup | {outcome('STARTUP')} ({os.environ.get('STARTUP_DURATION') or 'duration unavailable'}) |",
+              f"| Frontend health (included in stack --wait) | {outcome('STARTUP')} |",
+              f"| Worker smoke test | {outcome('WORKER')} |",
+              f"| Tempo outage readiness | {outcome('TEMPO')} |",
+              "",
+              "[Open workflow logs for Compose diagnostics](%s/%s/actions/runs/%s)"
+              % (os.environ.get("GITHUB_SERVER_URL", "https://github.com"), os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_RUN_ID"]),
+              "",
+          ]
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines))
+          PY
       - name: Diagnostic logs
         if: failure()
         run: docker compose -f infra/compose.yaml logs
       - name: Stop disposable CI stack
         if: always()
         run: docker compose -f infra/compose.yaml down
+
+  ci_report:
+    name: CI report
+    if: always()
+    needs: [backend, frontend, compose]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish workflow overview
+        env:
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          COMPOSE_RESULT: ${{ needs.compose.result }}
+          BACKEND_TEST_STATUS: ${{ needs.backend.outputs.test_status }}
+          BACKEND_TEST_TOTAL: ${{ needs.backend.outputs.test_total }}
+          BACKEND_TEST_PASSED: ${{ needs.backend.outputs.test_passed }}
+          BACKEND_TEST_FAILED: ${{ needs.backend.outputs.test_failed }}
+          BACKEND_TEST_SKIPPED: ${{ needs.backend.outputs.test_skipped }}
+          BACKEND_TEST_DURATION: ${{ needs.backend.outputs.test_duration }}
+          BACKEND_UNIT_TOTAL: ${{ needs.backend.outputs.unit_total }}
+          BACKEND_UNIT_PASSED: ${{ needs.backend.outputs.unit_passed }}
+          BACKEND_UNIT_FAILED: ${{ needs.backend.outputs.unit_failed }}
+          BACKEND_UNIT_SKIPPED: ${{ needs.backend.outputs.unit_skipped }}
+          POSTGRES_TOTAL: ${{ needs.backend.outputs.postgres_total }}
+          POSTGRES_PASSED: ${{ needs.backend.outputs.postgres_passed }}
+          POSTGRES_FAILED: ${{ needs.backend.outputs.postgres_failed }}
+          POSTGRES_SKIPPED: ${{ needs.backend.outputs.postgres_skipped }}
+          FRONTEND_TEST_STATUS: ${{ needs.frontend.outputs.test_status }}
+          FRONTEND_TEST_TOTAL: ${{ needs.frontend.outputs.test_total }}
+          FRONTEND_TEST_PASSED: ${{ needs.frontend.outputs.test_passed }}
+          FRONTEND_TEST_FAILED: ${{ needs.frontend.outputs.test_failed }}
+          FRONTEND_TEST_SKIPPED: ${{ needs.frontend.outputs.test_skipped }}
+          FRONTEND_TEST_DURATION: ${{ needs.frontend.outputs.test_duration }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          results = [
+              os.environ.get("BACKEND_RESULT", "unavailable"),
+              os.environ.get("FRONTEND_RESULT", "unavailable"),
+              os.environ.get("COMPOSE_RESULT", "unavailable"),
+          ]
+          if "failure" in results:
+              workflow = "failure"
+          elif "cancelled" in results:
+              workflow = "cancelled"
+          elif "skipped" in results or "unavailable" in results:
+              workflow = "partial / unavailable"
+          else:
+              workflow = "success"
+
+          def tests(prefix: str) -> str:
+              status = os.environ.get(f"{prefix}_TEST_STATUS") or "unavailable"
+              total = os.environ.get(f"{prefix}_TEST_TOTAL") or "unavailable"
+              passed = os.environ.get(f"{prefix}_TEST_PASSED") or "unavailable"
+              failed = os.environ.get(f"{prefix}_TEST_FAILED") or "unavailable"
+              skipped = os.environ.get(f"{prefix}_TEST_SKIPPED") or "unavailable"
+              duration = os.environ.get(f"{prefix}_TEST_DURATION") or "duration unavailable"
+              return f"{status}: {passed}/{total} passed; {failed} failed; {skipped} skipped ({duration})"
+
+          def subset(prefix: str) -> str:
+              total = os.environ.get(f"{prefix}_TOTAL")
+              if not total:
+                  return "unavailable"
+              passed = os.environ.get(f"{prefix}_PASSED") or "0"
+              failed = os.environ.get(f"{prefix}_FAILED") or "0"
+              skipped = os.environ.get(f"{prefix}_SKIPPED") or "0"
+              status = os.environ.get("BACKEND_TEST_STATUS") or "unavailable"
+              return f"{status}: {passed}/{total} passed; {failed} failed; {skipped} skipped"
+
+          def safe(value: str) -> str:
+              return value.replace("`", "'").replace("\n", " ")
+
+          lines = [
+              "## CI report",
+              "",
+              f"**Workflow:** `{os.environ.get('WORKFLOW_NAME', 'checks')}` — **{workflow}**",
+              "",
+              "| Signal | Value |",
+              "| --- | --- |",
+              f"| Branch/ref | `{safe(os.environ.get('REF_NAME', 'unavailable'))}` |",
+              f"| Commit | `{safe(os.environ.get('COMMIT_SHA', 'unavailable'))}` |",
+              "",
+              "### Job status",
+              "",
+              "| Job | Status |",
+              "| --- | --- |",
+              f"| Backend and PostgreSQL | {os.environ.get('BACKEND_RESULT', 'unavailable')} |",
+              f"| Frontend and Contracts | {os.environ.get('FRONTEND_RESULT', 'unavailable')} |",
+              f"| Docker Compose | {os.environ.get('COMPOSE_RESULT', 'unavailable')} |",
+              "",
+              "### Test counts and duration",
+              "",
+              "| Suite | Result |",
+              "| --- | --- |",
+              f"| Backend unit/contract pytest | {subset('BACKEND_UNIT')} |",
+              f"| PostgreSQL integration pytest | {subset('POSTGRES')} |",
+              f"| Aggregate backend pytest duration | {tests('BACKEND')} |",
+              f"| Frontend Vitest | {tests('FRONTEND')} |",
+              "",
+              "### Covered checks",
+              "",
+              "- Backend: Ruff lint/format, strict mypy, migrations, schema drift, and PostgreSQL-backed tests.",
+              "- Frontend/contracts: OpenAPI/generated TypeScript drift, ESLint, Prettier, TypeScript, Vitest, and production build.",
+              "- Compose: configuration and binding checks, PostgreSQL readiness, packaged API migration, container startup, worker smoke, and Tempo outage readiness.",
+              "- Planned contract validation and tooling checks: unavailable because they are not configured in the existing workflow; no new gates were added for reporting.",
+              "",
+              f"[Open workflow logs for detailed diagnostics]({os.environ.get('RUN_URL', '#')})",
+              "",
+          ]
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines))
+          PY
