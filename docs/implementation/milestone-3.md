@@ -1,15 +1,33 @@
 # Milestone 3 execution and HTTP transport contract
 
-Status: **FROZEN for implementation planning**. The repository owner approved
-M3-00 on 2026-10-17. This packet was prepared from repository baseline
-`75daa258eac7dd11d26c2e9ce4af945a74e5a41b` and does not authorize production
-implementation, migrations, generated artifacts, a commit, or publication.
+Contract status: **FROZEN**. The repository owner approved M3-00 on 2026-10-17
+from baseline `75daa258eac7dd11d26c2e9ce4af945a74e5a41b`. Implementation status:
+M3-01 through M3-05 are integrated on `main`, ending at
+`95a3a86812876c9fa0b0730f4316e836a868684a`; M3-06 independent acceptance is
+pending. The frozen contract remains normative and this status update does not
+authorize Milestone 4 or alter accepted architecture.
 
 Normative inputs are [AGENTS.md](../../AGENTS.md), the [MVP](../MVP.md),
 [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs
 0001–0008, the accepted [M2 packet](milestone-2.md), and the
 [M3 plan](../development/milestone-3-plan.md). ADR 0008 resolves the M2 transport
 state and TLS-policy checkpoints without rewriting M2 history.
+
+## Implementation ledger
+
+| Slice                        | Integrated commit                          | Result                                                                                            |
+| ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| M3-00 — Contract freeze      | `3a83e2682a344b6b70af7b9c408b08b39541aa2a` | ADR 0008 and the execution/transport contracts are frozen.                                        |
+| M3-01 — Execution creation   | `a12744c1db31ec13046594be5ca5205ff48a500d` | Atomic revision pinning, materialization, idempotency, and enqueue are implemented.               |
+| M3-02 — Attempt persistence  | `26f92c2e50e3ff19b3065568fe0262519214c61c` | Fenced attempts, preparation, secrets, redaction, and bounded observations are implemented.       |
+| M3-03 — HTTP adapter         | `becbc5517c1e7ea94167e95ae64b615f9cf85ea2` | DNS-pinned dispatch, target policy, TLS, redirect, timeout, and capture controls are implemented. |
+| M3-04 — Worker orchestration | `4264e63443c76e24c47e626cb4dea5c28588fd40` | Resumable fenced dispatch, recovery, and conservative replay are implemented.                     |
+| M3-05 — Read APIs            | `95a3a86812876c9fa0b0730f4316e836a868684a` | Execution/attempt reads and generated client contracts are implemented.                           |
+| M3-06 — Acceptance           | Pending                                    | Independent review, full local gates, Compose, and final CI evidence remain.                      |
+
+Slice commits record implementation integration, not milestone acceptance. A
+final M3 **PASS** still requires the evidence defined in this packet and the
+[quality gates](../development/quality-gates.md).
 
 ## 1. Scope
 

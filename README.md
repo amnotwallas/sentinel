@@ -1,39 +1,169 @@
 # Sentinel
 
-Sentinel is an open-source, self-hosted API reliability and distributed tracing
-platform. This repository currently implements **Milestone 1: Repository
-Foundation and Durable Work Skeleton**. It provides a FastAPI health API, durable
-PostgreSQL queue, worker probe handler, React shell, migrations, and CI.
+Sentinel is an open-source, self-hosted platform for deterministic API
+regression testing with distributed-trace correlation. It is built for a single
+operator running locally or on a trusted development network.
 
-Product definitions and outbound HTTP test execution begin in later milestones.
-The internal probe sends no target requests and produces no functional test
-verdict.
+Sentinel is designed to answer three questions with evidence:
+
+1. **What broke?** Which required assertion or explicitly selected baseline
+   value changed?
+2. **Where did it fail?** Which related spans contain errors or unexpected
+   latency?
+3. **What changed before the failure?** Which definition, baseline, service
+   version, or deployment attribute differs from an earlier run?
+
+Sentinel reports deterministic observations; it does not guess or claim root
+cause.
+
+## Why Sentinel
+
+- **Deterministic by design.** Only explicit assertions and baseline selectors
+  affect a verdict. Exact response-body comparison is opt-in.
+- **Trace-aware, not trace-dependent.** OpenTelemetry evidence enriches a result,
+  but missing or delayed telemetry never changes the functional verdict.
+- **Safe execution semantics.** Dispatch intent is persisted before network I/O,
+  ambiguous non-idempotent requests are not silently replayed, and every replay
+  receives new attempt and trace identifiers.
+- **Secure local operation.** Secret references, response redaction, bounded
+  capture, SSRF defenses, verified TLS, and loopback-only published ports are
+  part of the core design.
+- **Simple infrastructure.** The API and worker form a modular monolith backed by
+  PostgreSQL; no Redis, message broker, or proprietary tracing protocol is
+  required.
+
+## Current status
+
+Sentinel is under active MVP development. The current `main` branch includes:
+
+- versioned projects, environments, test cases, and ordered suites;
+- immutable definition revisions, change records, strong ETags, and optimistic
+  concurrency;
+- atomic execution creation, immutable revision pinning, and optional
+  `Idempotency-Key` handling;
+- a durable PostgreSQL job queue with leases, fencing, heartbeats, bounded retry,
+  and crash recovery;
+- request preparation with environment variables and out-of-band secret
+  resolution;
+- a DNS-pinned HTTP adapter with target validation, verified TLS, redirect
+  controls, timeouts, bounded response capture, and no implicit proxy or retry;
+- conservative replay handling for ambiguous dispatches;
+- redacted execution and attempt observations exposed through `/api/v1`;
+- W3C Trace Context and Baggage propagation with OpenTelemetry client spans;
+- generated OpenAPI TypeScript types, a React application shell, Docker Compose,
+  migrations, and CI quality gates.
+
+The remaining MVP work includes deterministic assertion and baseline evaluation,
+Tempo trace reconciliation, the complete authoring/results UI, retention, and
+release hardening. Milestone 3 implementation currently reaches M3-05; its
+independent M3-06 acceptance is still pending. See the
+[roadmap](docs/ROADMAP.md) for the ordered delivery plan.
+
+## How it works
+
+Definitions are immutable inputs to an execution. The API creates the execution
+and its job in one transaction, then a worker owns the network boundary and
+checkpoints each attempt around the outbound request.
+
+```mermaid
+flowchart LR
+    A[Define project and environment] --> B[Create versioned test or suite]
+    B --> C[POST /api/v1/executions]
+    C --> D[(Persist execution, pinned revisions, and job)]
+    D --> E[Worker leases job]
+    E --> F[Prepare request and resolve secret references]
+    F --> G[Persist attempt and trace context]
+    G --> H[Validate target and send request]
+    H --> I[Redact and bound observation]
+    I --> J[Execution and attempt APIs]
+    I -. upcoming .-> K[Assertions and immutable baselines]
+    I -. upcoming .-> L[Tempo trace reconciliation]
+
+    classDef planned stroke-dasharray: 5 5,fill:#f6f8fa,color:#57606a;
+    class K,L planned;
+```
+
+PostgreSQL delivery is **at least once**, but a recovered job is not automatic
+permission to repeat an HTTP request. If a crash leaves dispatch ambiguous,
+Sentinel replays safe methods with a new attempt and marks unsafe requests
+inconclusive unless the definition explicitly permits replay.
+
+```mermaid
+flowchart TD
+    A[Attempt persisted as dispatching] --> B{Dispatch outcome known?}
+    B -->|Response received| C[Store redacted response]
+    B -->|Known transport failure| D[Store transport failure]
+    B -->|Crash or uncertain send| E{Replay allowed?}
+    E -->|GET, HEAD, OPTIONS or explicit opt-in| F[Create a new attempt]
+    E -->|No| G[Mark attempt indeterminate]
+    F --> A
+    C --> H[Finish current execution step]
+    D --> H
+    G --> I[Return an inconclusive outcome]
+```
+
+## Architecture
+
+The backend is one Python package with separate API and worker processes. Domain
+modules remain independent from FastAPI, SQLAlchemy, HTTPX, and worker runtime
+details; adapters provide those external capabilities.
+
+```mermaid
+flowchart LR
+    Operator[Operator] --> Frontend[React and typed API client]
+    Frontend --> API[FastAPI control plane]
+    API <--> PostgreSQL[(PostgreSQL)]
+    Worker[Worker data plane] <--> PostgreSQL
+    Worker --> Target[Target APIs]
+    Worker -->|OTLP spans| Tempo[Grafana Tempo]
+    API -. future trace lookup .-> Tempo
+
+    subgraph Sentinel
+        Frontend
+        API
+        Worker
+        PostgreSQL
+    end
+```
+
+| Component  | Responsibility                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| React      | Presentation and generated, typed API access. The complete product UI is still in development. |
+| FastAPI    | Authentication, validation, RFC 9457 problems, catalog operations, and execution APIs.         |
+| Worker     | Job leasing, request preparation, safe HTTP dispatch, recovery, and result recording.          |
+| PostgreSQL | Source of truth and low-volume durable job queue.                                              |
+| Tempo      | OpenTelemetry trace storage; unavailable telemetry does not make functional execution fail.    |
+
+## Technology
+
+- Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, HTTPX/httpcore
+- PostgreSQL 16
+- React 19, TypeScript, Vite, and `openapi-fetch`
+- OpenTelemetry and Grafana Tempo
+- Docker Compose, pytest, Ruff, mypy, Vitest, ESLint, and Prettier
+- GitHub Actions
 
 ## Prerequisites
 
-- Docker Engine/Desktop with Docker Compose v2.20 or newer for the full stack.
-- Python 3.12 and uv for native backend development.
-- Node 22.12 or newer in the Node 22 release line and npm for frontend development.
-- PostgreSQL 16 for native integration tests. CI uses real PostgreSQL 16.
+- Docker Engine/Desktop with Docker Compose v2.20 or newer for the full stack
+- Python 3.12 and [uv](https://docs.astral.sh/uv/) for native backend development
+- Node.js 22.12 or newer in the Node 22 release line and npm for frontend work
+- PostgreSQL 16 for native integration tests
 
-See [the approved MVP](docs/MVP.md), [architecture](docs/architecture/README.md),
-[ADRs](docs/architecture/ADRs/), [roadmap](docs/ROADMAP.md), and
-[engineering guide](AGENTS.md).
+## Quick start with Docker Compose
 
-## Start with Docker Compose
-
-From the repository root:
+Create the local environment file and generate an API token:
 
 ```sh
 cp .env.example .env
 openssl rand -hex 32
 ```
 
-Paste the generated value into `SENTINEL_API_TOKEN` in `.env`. The container API
-listens on its internal non-loopback interface, so the token guard applies even
-though published host ports are loopback-only. Use a different database password
-before sharing a machine; use a URL-safe value or percent-encode credentials in a
-native database URL. Keep `.env` private and uncommitted.
+Paste the generated value into `SENTINEL_API_TOKEN` in `.env`. Change the
+default database password before sharing a machine, and keep `.env` private and
+uncommitted.
+
+Start PostgreSQL, apply migrations, and launch the stack:
 
 ```sh
 docker compose --env-file .env -f infra/compose.yaml config --quiet
@@ -42,10 +172,13 @@ docker compose --env-file .env -f infra/compose.yaml run --build --rm api alembi
 docker compose --env-file .env -f infra/compose.yaml up -d --build --wait --wait-timeout 180
 ```
 
-Open `http://127.0.0.1:5173`. The API is at `http://127.0.0.1:8000` and Tempo's
-readiness endpoint is at `http://127.0.0.1:3200/ready`. Tempo is included because
-Milestone 1 explicitly requires it; Sentinel trace correlation arrives later.
-No Grafana UI, Collector, Redis, or message broker is required.
+Services are published on loopback only:
+
+- frontend shell: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:8000`
+- Tempo readiness: `http://127.0.0.1:3200/ready`
+
+Check the stack and exercise the durable worker probe:
 
 ```sh
 curl --fail http://127.0.0.1:8000/health/live
@@ -54,150 +187,89 @@ docker compose --env-file .env -f infra/compose.yaml exec -T api python -m senti
 docker compose --env-file .env -f infra/compose.yaml logs --tail 100 worker
 ```
 
-The bounded smoke command inserts a probe transactionally and waits for the
-running worker to finish it. Health endpoints are public and contain no secret
-configuration; `/docs` and `/openapi.json` require the configured bearer token.
-Swagger's page itself also requires authorization, so prefer a client that can
-send the header when using a token-protected installation.
+Health endpoints are public and expose no secret configuration. Business routes,
+`/docs`, and `/openapi.json` require the configured bearer token because the
+container API listens on a non-loopback interface internally.
+
+Stop the stack without deleting its named volumes:
 
 ```sh
-docker compose --env-file .env -f infra/compose.yaml stop tempo
-curl --fail http://127.0.0.1:8000/health/ready
-docker compose --env-file .env -f infra/compose.yaml start tempo
 docker compose --env-file .env -f infra/compose.yaml down
 ```
 
-Stopping Tempo leaves PostgreSQL-backed API readiness available, with
-`tempo: unavailable`. `down` preserves named PostgreSQL and Tempo volumes. Do not
-add `--volumes` unless intentionally deleting local data.
+Do not add `--volumes` unless you intend to delete local PostgreSQL and Tempo
+data.
 
-## Native backend development
+## Native development
+
+Install locked dependencies and migrate the configured database:
 
 ```sh
-uv sync --project backend --frozen
+make setup
 uv run --env-file .env --project backend alembic -c backend/alembic.ini upgrade head
+```
+
+Run the backend processes in separate terminals:
+
+```sh
 uv run --env-file .env --project backend sentinel-api
-```
-
-In another terminal:
-
-```sh
 uv run --env-file .env --project backend sentinel-worker
-uv run --env-file .env --project backend sentinel-probe
-uv run --env-file .env --project backend python -m sentinel.worker.smoke
 ```
 
-Native API binding defaults to `127.0.0.1`; non-loopback binding requires a bearer
-token. The native worker is one process with one active handler. The API and
-worker import the same installed package. Neither runs schema migrations
-automatically. Readiness compares the database revisions with the single head in
-the deployed Alembic migration graph. It returns `503` for missing or mismatched
-revisions, missing/ambiguous migration assets, or a connection failure. Run
-migrations explicitly before starting workers; readiness never executes them.
-
-## Frontend development
+Run the frontend development server:
 
 ```sh
-cd frontend
-npm ci
-npm run dev
+npm --prefix frontend run dev
 ```
 
-Vite listens on `127.0.0.1:5173` and proxies health/API paths to
-`http://127.0.0.1:8000`. `SENTINEL_API_PROXY` overrides that server-side proxy URL
-for Compose. Never use `VITE_` environment variables for secrets; those values
-become browser assets. The shell does not resolve credentials or expose product
-authoring workflows.
+The API and worker never run migrations automatically. Native API binding
+defaults to `127.0.0.1`; binding to a non-loopback address requires a bearer
+token.
 
-## Migrations
+## Verification
+
+Use the repository wrappers for local feedback:
 
 ```sh
-uv run --env-file .env --project backend alembic -c backend/alembic.ini current
-uv run --env-file .env --project backend alembic -c backend/alembic.ini upgrade head
-uv run --env-file .env --project backend alembic -c backend/alembic.ini check
-uv run --project backend alembic -c backend/alembic.ini upgrade head --sql
+make check-backend
+make check-frontend
+make check-contract
+make check-fast
+make check-compose-config
 ```
 
-Review the generated SQL before applying schema changes. For a new schema change,
-use `alembic revision --autogenerate -m "description"` from `backend/`, review
-the migration, and update the models/tests together. The initial schema contains
-only `executions` (internal probe envelopes) and `jobs`; catalog/revision fields
-and other subject types will be introduced by later migrations.
+`make check-fast` excludes PostgreSQL integration, migration round-trip, and full
+Compose acceptance. Integration tests require a dedicated disposable database
+whose name ends in `_test`; the fixtures clean database state and must never point
+at data you want to keep. Follow the exact isolated recipes in
+[local quality gates](docs/development/quality-gates.md).
 
-Downgrade `0001` removes the two tables and their probe/queue data. Verify
-downgrade only in a disposable test database, or take a backup and explicitly
-accept data loss first:
+Runtime OpenAPI and generated TypeScript artifacts are committed. CI regenerates
+them and rejects contract drift.
 
-```sh
-uv run --project backend alembic -c backend/alembic.ini downgrade base
-uv run --project backend alembic -c backend/alembic.ini upgrade head
+## Repository layout
+
+```text
+backend/   FastAPI API, worker, domain modules, persistence, migrations, tests
+frontend/  React application, generated API types, component tests
+infra/     Docker Compose, Tempo configuration, infrastructure checks
+docs/      MVP, architecture, ADRs, operations, roadmap, implementation records
 ```
 
-Set `SENTINEL_DATABASE_URL` to the disposable database before these commands.
+## Documentation
 
-## Run checks
+- [MVP scope and acceptance contract](docs/MVP.md)
+- [Architecture](docs/architecture/README.md)
+- [Architecture decision records](docs/architecture/ADRs/)
+- [Roadmap](docs/ROADMAP.md)
+- [Durable work operations](docs/operations/durable-work.md)
+- [Development workflow](docs/development/workflow.md)
+- [Engineering guide](AGENTS.md)
 
-Create a dedicated `sentinel_test` database. For the local Compose PostgreSQL:
+## Product boundaries
 
-```sh
-docker compose --env-file .env -f infra/compose.yaml exec -T postgres createdb -U sentinel sentinel_test
-```
-
-Migrate the test database separately, using its connection string:
-
-```sh
-SENTINEL_DATABASE_URL=postgresql+psycopg://sentinel:sentinel-local-only@127.0.0.1:5432/sentinel_test \
-  uv run --project backend alembic -c backend/alembic.ini upgrade head
-uv run --env-file .env --project backend pytest backend/tests
-uv run --project backend ruff check backend
-uv run --project backend ruff format --check backend
-cd backend
-uv run mypy
-```
-
-Adjust credentials to match `.env`. `SENTINEL_TEST_DATABASE_URL` must identify a
-database whose name ends in `_test`. Tests delete only `jobs` and `executions` in
-that dedicated database before each integration test. Never point tests at a
-database whose data you want to retain. Missing database configuration fails the
-suite instead of silently skipping integration tests. Unit/contract-only runs
-use `pytest -m 'not integration'`.
-
-```sh
-cd frontend
-npm run lint
-npm run format:check
-npm run typecheck
-npm test
-npm run build
-```
-
-Generate the frontend contract from the installed backend, from the root:
-
-```sh
-uv run --project backend python -m sentinel.api.export frontend/openapi.json
-cd frontend
-npm run api:generate
-```
-
-Both `frontend/openapi.json` and `frontend/src/shared/api/generated/schema.ts`
-are committed artifacts. CI regenerates them and rejects drift. The initial
-contract contains only health endpoints.
-
-GitHub Actions runs backend lint/type/tests with PostgreSQL, migration
-up/down/drift checks, frontend checks/build, contract generation, rendered Compose
-port validation, and a full Compose worker smoke run.
-
-For local feedback, `make setup` installs locked dependencies and `make check-fast`
-runs backend non-integration, frontend, developer-tooling and non-mutating contract
-checks. See [quality gates](docs/development/quality-gates.md) for PostgreSQL and
-Docker acceptance, [development workflow](docs/development/workflow.md) for agent
-ownership/worktrees, and [Milestone 2 planning](docs/development/milestone-2-plan.md).
-
-## Operations and limitations
-
-See [durable work operations](docs/operations/durable-work.md) for transaction
-boundaries, lease ownership, retry behavior, failure modes, and queue limitations.
-
-This milestone has no public enqueue endpoint. `sentinel-probe` and the smoke
-command are internal verification tools. No target HTTP calls, test definitions,
-baseline comparisons, or trace correlation are implemented yet.
+The MVP is deliberately single-user, local-first, and self-hosted. It does not
+include multi-tenancy, billing, AI-generated analysis, scheduling, alerting,
+Kubernetes, a dedicated message broker, load testing, or a proprietary tracing
+protocol. Those exclusions keep Sentinel focused on reproducible API evidence and
+safe recovery.

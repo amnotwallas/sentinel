@@ -4,7 +4,9 @@ This is a developer collaboration guide, not a change to the product architectur
 [AGENTS.md](../../AGENTS.md), the [MVP](../MVP.md), [architecture](../architecture/README.md),
 accepted ADRs, and [roadmap](../ROADMAP.md) remain authoritative. The
 [audit](workflow-audit.md) records evidence and unapplied recommendations;
-[Milestone 2 plan](milestone-2-plan.md) defines the proposed implementation sequence.
+the [Milestone 3 plan](milestone-3-plan.md) records the current implementation
+sequence and remaining acceptance gate. Earlier milestone plans remain historical
+ledgers.
 
 ## Roles and ownership
 
@@ -98,11 +100,11 @@ manual worktrees, use `.worktrees/<task>` (ignored by Git and Docker) with the
 following Git fallback. Never combine a managed session with a second manual
 worktree for that same task. Never force-remove a worktree with pending changes.
 
-Branches: `chore/developer-workflow`, `feat/m2-<slice>`,
-`test/m2-<acceptance>`, `fix/m2-<defect>`. A short-lived `integration/m2-catalog`
-branch is useful only if several reviewed slices are combined; otherwise each
-slice targets `main`. No permanent backend/frontend branches. Keep PRs scoped to
-one acceptance outcome; coordinator controls integration order and migration IDs.
+Branches use the task and milestone, for example `feat/m4-<slice>`,
+`test/m3-acceptance`, or `fix/m3-<defect>`. A short-lived integration branch is
+useful only when several reviewed slices must be combined; otherwise each slice
+targets `main`. No permanent backend/frontend branches. Keep PRs scoped to one
+acceptance outcome; the coordinator controls integration order and migration IDs.
 
 Git shares refs and object storage across worktrees. Serialize commit/rebase/merge
 and branch-management operations. Do not copy `.env`, secret stores, `.venv` or
@@ -112,10 +114,10 @@ Do not add `.worktreeinclude` entries for secrets.
 ## Runtime isolation
 
 Worktrees isolate files, not databases, ports or `/tmp`. Each writer's PostgreSQL
-tests use a dedicated disposable `<task>_test` database. The current fixtures delete
-all jobs/executions, so do not run concurrent suites in one database or enable
-pytest parallel workers with shared fixtures. Migration downgrade uses a newly
-created disposable database only.
+tests use a dedicated disposable `<task>_test` database. The fixtures clean
+catalog, job, execution, and attempt state, so do not run concurrent suites in one
+database or enable pytest parallel workers with shared fixtures. Migration
+downgrade uses a newly created disposable database only.
 
 Initially assign one full Compose runtime owner. `-p` isolates project resources
 and volumes but does **not** replace the fixed published ports. Concurrent stacks
@@ -126,49 +128,27 @@ Never stop another task's stack or prune shared Docker volumes. The
 
 ## Starting parallel work
 
-These steps are for a later authorized implementation session. This change does
-not begin Milestone 2. M2-00's design baseline is in the
-[contract packet](../implementation/milestone-2.md); authorize the selected
-slice before feature work. Make this reviewed workflow and readiness fix available
-to all worktrees through an approved
-commit or explicitly transferred reviewed files; new worktrees do not inherit
-uncommitted files by default.
+Use the current milestone plan and accepted contract to define the next slice.
+New worktrees do not inherit uncommitted files, so start from the exact reviewed
+base or explicitly transfer the reviewed changes.
 
 1. Coordinator checks `git status --short --branch`, `git remote -v`,
    `git worktree list`, and records `git rev-parse HEAD` as the common base.
    Reconcile any unrelated changes before proceeding; never reset them.
-2. Open isolated app sessions based on that SHA. If choosing manual worktrees
-   instead, run the following from a clean repository root (no commits/pushes):
-
-   ```sh
-   sentinel_base=$(git rev-parse HEAD)
-   git check-ignore .worktrees/probe
-   git worktree add -b integration/m2-catalog .worktrees/m2-integration "$sentinel_base"
-   git worktree add -b feat/m2-projects .worktrees/m2-backend "$sentinel_base"
-   git worktree add -b test/m2-contract-consumption .worktrees/m2-frontend "$sentinel_base"
-   git worktree add -b test/m2-catalog-acceptance .worktrees/m2-qa "$sentinel_base"
-   ```
-
-   Use fresh task names if paths/branches already exist; inspect rather than force.
-   Native sessions can instead be launched with `codex -C /absolute/repo --worktree`.
-   For pre-created manual worktrees, use `codex -C /absolute/worktree` without a
-   second `--worktree` flag. Sandbox approval may be needed for `.git` writes.
+2. Open isolated app sessions or manual worktrees based on that SHA. Use fresh
+   task-specific branch/path names, inspect existing worktrees before creation,
+   and never force-remove a worktree with pending changes.
 3. In each writer worktree run `make setup`, then its relevant fast gate. Reserve
-   database/ports in the task packet. Backend starts M2-02 in its owned files;
-   coordinator applies shared wiring and catalog fixture cleanup when that schema
-   exists. The readiness portion of M2-01 is already verified. Frontend reviews
-   planned schema/fixtures; QA prepares contract cases from M2-00. Typed runtime
-   project calls wait for the integrated generated contract.
+   the database and ports in the task packet. Generated-contract consumers wait
+   for the coordinator-owned integrated contract.
 4. With collaboration tools, coordinator sends each agent the packet including
    its absolute path and instructions to use that directory for every command.
    A read-only reviewer can start immediately. Without spawn tools, use separate
    app/CLI sessions in the same designated worktrees; there is no required custom
    agent-role TOML configuration or shell `codex spawn` command.
-5. After the project contract is integrated, frontend implements typed-consumption
-   tests against that generated contract while backend builds environments.
-   QA reviews the integrated project SHA and writes independent acceptance tests.
-   Follow the plan's dependencies for test cases and suites, then integrate and
-   run the combined gates. Commits, pushes and merges wait for authorization.
+5. Follow the current plan's dependencies, integrate reviewed slices in order,
+   regenerate shared contracts once, and run the combined gates. Commits, pushes,
+   and merges wait for authorization.
 
 ## Repository skills
 

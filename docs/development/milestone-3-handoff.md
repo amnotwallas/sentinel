@@ -1,11 +1,10 @@
-# Milestone 3 implementation handoff
+# Milestone 3 acceptance handoff
 
-Status: M3-00 architecture and security contract **FROZEN** on 2026-10-17;
-production implementation is not authorized. Milestone 2 is accepted with status
-**PASS** at
-`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715` on `main`. This document does not
-authorize Milestone 3 implementation, a commit, a push, a merge, a migration, or
-a change to an accepted architectural contract.
+Status: M3-00 through M3-05 are integrated on `main`, ending at
+`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 independent acceptance is the
+remaining Milestone 3 task. Milestone 2 remains accepted with status **PASS** at
+`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. This handoff records implementation
+state; it does not declare Milestone 3 complete or authorize Milestone 4.
 
 The repository owner supplied the accepted remote evidence for that SHA:
 [GitHub Actions run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329),
@@ -30,25 +29,27 @@ not separately supplied.
   and [task plan](milestone-3-plan.md) control M3 compatibility surfaces and slice
   ownership.
 - The [Milestone 2 implementation packet](../implementation/milestone-2.md) and
-  planned OpenAPI/fixtures contain reviewed future-interface inputs only. They do
-  not make unimplemented M3 routes or schemas part of the runtime contract.
+  planned OpenAPI/fixtures remain historical review inputs. Runtime OpenAPI and
+  generated TypeScript now describe the implemented M3 routes.
 - Use the [development workflow](workflow.md) for ownership and isolation and the
   [quality gates](quality-gates.md) for verification evidence.
 
-## Incoming implemented foundation
+## Integrated implementation
 
 - M1 provides the durable PostgreSQL job queue, bounded delivery, lease heartbeat,
   expiration recovery, and stale-token fencing.
 - M2 provides immutable project/environment/test/suite inputs, exact suite revision
   pins, canonical request policies, secret references, strong ETags, change
   history, active OpenAPI generation, and typed frontend client consumption.
-- Runtime APIs contain health and the 16 M2 catalog operations only. No execution
-  endpoint, target HTTP dispatch, secret resolution, result evaluation, baseline
-  behavior, or Tempo reconciliation is implemented by this handoff.
+- M3-01 through M3-05 provide execution creation and reads, attempt persistence,
+  in-memory secret resolution, redacted bounded observations, safe target HTTP
+  dispatch, conservative recovery, and generated client contracts.
+- Assertion/baseline evaluation, Tempo reconciliation, and the product UI remain
+  outside the implemented runtime and belong to later milestones.
 
 ## Milestone 3 outcome and boundaries
 
-Milestone 3 must execute one test or ordered suite from `POST /api/v1/executions`
+Milestone 3 executes one test or ordered suite from `POST /api/v1/executions`
 to a durable, bounded, redacted observation while preserving deterministic crash
 recovery. It includes execution/idempotency persistence, revision pinning, request
 preparation, in-memory secret resolution, the safe HTTP adapter, attempt trace
@@ -78,11 +79,11 @@ telemetry must not alter functional execution outcomes.
    Trust is default roots plus an optional deployment-wide additive CA bundle;
    proxy inheritance, mTLS, early data, insecure mode, and target pooling are out
    of MVP scope.
-5. The locked HTTPX/httpcore stack can dial a selected IP while retaining the
+5. The integrated HTTPX/httpcore adapter dials a selected IP while retaining the
    original authority and SNI/hostname verification through a narrow
-   version-qualified adapter seam. M3-03 must prove the behavior locally before
-   feature code; dependency upgrades require requalification and may not fall
-   back to hostname re-resolution.
+   version-qualified seam. M3-06 must independently requalify this behavior;
+   dependency upgrades require the same gate and may not fall back to hostname
+   re-resolution.
 6. Execution, item, attempt, artifact, idempotency, and job transaction boundaries
    are frozen in the M3 packet. Queue delivery, attempt sequence, redirect hops,
    and trace retries remain distinct.
@@ -95,33 +96,34 @@ implemented slices.
 
 ## Approved delivery sequence
 
-This is a handoff sequence, not implementation authorization. The coordinator
-must turn each approved slice into a task packet with an exact base SHA, branch,
-worktree, owned files, database, ports, interfaces, tests, and publication
-permissions.
+The integrated sequence and remaining acceptance gate are:
 
-1. **M3-00 — Freeze execution contracts and recovery cases.** Complete. ADR 0008,
-   the M3 packet, named acceptance cases, transaction boundaries, and migration
-   reservations are documented; publication remains separately authorized.
-2. **M3-01 — Atomic execution creation and immutable materialization.** Persist
+1. **M3-00 — Freeze execution contracts and recovery cases.** Integrated at
+   `3a83e26`. ADR 0008, the M3 packet, named acceptance cases, transaction
+   boundaries, and migration reservations are documented.
+2. **M3-01 — Atomic execution creation and immutable materialization.** Integrated
+   at `a12744c`. Persist
    executions/items/idempotency records, pin all source revisions in one
    transaction, enqueue atomically, and add POST/list/detail contracts without
    dispatching a target request.
-3. **M3-02 — Request preparation and protected observations.** Add template
+3. **M3-02 — Request preparation and protected observations.** Integrated at
+   `26f92c2`. Add template
    expansion, in-memory secret resolution, request fingerprinting, bounded capture,
    and redaction-before-persistence with synthetic canary coverage.
-4. **M3-03 — Safe HTTP adapter.** First pass the locked-stack selected-IP,
+4. **M3-03 — Safe HTTP adapter.** Integrated at `becbc55`. The locked-stack selected-IP,
    authority, SNI, hostname, retry/proxy, and connection-isolation feasibility
    gate; then enforce DNS/address and redirect-hop validation, credential stripping
    across origins, TLS policy, timeout/size limits, streaming, and bounded
    concurrency through explicit ports.
-5. **M3-04 — Resumable dispatch and recovery.** Persist `dispatching` before I/O,
+5. **M3-04 — Resumable dispatch and recovery.** Integrated at `4264e63`. Persist
+   `dispatching` before I/O,
    create per-attempt trace/span identity, checkpoint responses, separate job
    redelivery from HTTP replay, and implement conservative ambiguous recovery.
-6. **M3-05 — Execution and attempt reads plus typed client handoff.** Publish only
+6. **M3-05 — Execution and attempt reads plus typed client handoff.** Integrated at
+   `95a3a86`. Publish only
    implemented runtime schemas, regenerate artifacts once under coordinator
    ownership, and verify bounded redacted outputs.
-7. **M3-06 — Independent acceptance and milestone integration.** Exercise single
+7. **M3-06 — Independent acceptance and milestone integration.** **Pending.** Exercise single
    tests and ordered suites, termination at every checkpoint, ambiguity/replay,
    target-policy attacks, privacy sinks, PostgreSQL/migration/contract gates, full
    Compose, and final CI on the exact integrated SHA.
@@ -136,8 +138,8 @@ permissions.
   types, and write sets are frozen. A security/QA reviewer is read-only unless
   assigned exclusive acceptance files.
 - Use fresh isolated worktrees from the accepted base, separate disposable
-  `_test` databases, and reserved ports. Do not reuse the long-lived M2 worktrees
-  as evidence for an M3 candidate.
+  `_test` databases, and reserved ports. Do not reuse another task's worktree or
+  runtime as evidence for an M3 candidate.
 - Apply test-driven development to every production slice. Run focused tests,
   backend/frontend/contract gates as applicable, real PostgreSQL and migration
   round trips for persistence, security review for request/secret/network paths,
@@ -147,11 +149,10 @@ permissions.
   workflow rules. Test success never grants commit, push, merge, or remote-setting
   permission.
 
-## Start condition
+## Next action
 
-The contract decisions required for M3-01 are resolved. The next coordinator may
-prepare an M3-01 task packet from the accepted base only after the M3-00
-documentation candidate is reviewed/published and explicit production
-implementation authorization is supplied. M3-03 has the additional mandatory
-transport feasibility gate. No current authorization permits M3-01, a migration,
-runtime OpenAPI generation, a commit, or a push.
+Run M3-06 against the exact integrated candidate. Record independent review,
+PostgreSQL and migration evidence, runtime/generated contract checks, privacy and
+transport results, full Compose acceptance, and the final remote CI jobs. Only
+then may the roadmap and implementation packet mark Milestone 3 **PASS** and hand
+off to Milestone 4.

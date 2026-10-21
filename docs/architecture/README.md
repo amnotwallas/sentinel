@@ -17,10 +17,18 @@ The architecture favors auditable behavior over inference:
 
 The product contract and acceptance criteria are in [`../MVP.md`](../MVP.md).
 
-Milestone 1's implemented setup and transaction boundaries are documented in the
-[repository README](../../README.md) and [durable work operations](../operations/durable-work.md).
-Only minimal probe execution envelopes and jobs currently exist; the full data
-model below remains the approved target for later milestones.
+Current implementation status is tracked in the [roadmap](../ROADMAP.md).
+Milestones 1 and 2 are accepted, and Milestone 3 is integrated through M3-05 with
+M3-06 acceptance pending. The runtime includes versioned definitions, durable
+executions and attempts, safe HTTP dispatch/recovery, redacted observations, and
+execution read APIs. Evaluation/baselines, Tempo reconciliation, and the complete
+UI remain later milestones.
+
+The component responsibilities and data model below describe the complete MVP
+architecture. Sections that cover later milestones are target contracts, not a
+claim that every component is already implemented. Current transaction and
+recovery behavior is documented in
+[durable work operations](../operations/durable-work.md).
 
 ## 2. Context and runtime topology
 

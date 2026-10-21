@@ -1,17 +1,18 @@
 # Milestone 3 task plan
 
-Milestone 3 contract design is frozen by the repository owner as M3-00 on
-2026-10-17. The starting implementation baseline is
-`75daa258eac7dd11d26c2e9ce4af945a74e5a41b`; documentation changes that record
-the freeze remain an uncommitted candidate until separately authorized.
+Milestone 3 contract design was frozen by the repository owner as M3-00 on
+2026-10-17 from baseline `75daa258eac7dd11d26c2e9ce4af945a74e5a41b`.
+M3-01 through M3-05 are integrated on `main`, ending at
+`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 independent acceptance is the
+only remaining task before a Milestone 3 **PASS** decision.
 
 Scope and exit criteria come from the
 [roadmap](../ROADMAP.md#milestone-3-safe-execution-lifecycle-and-http-adapter).
 The exact lifecycle, TLS, redirect, API, persistence, and acceptance contracts are
 in the [M3 implementation packet](../implementation/milestone-3.md) and
 [ADR 0008](../architecture/ADRs/0008-http-dispatch-outcomes-and-tls-policy.md).
-This plan does not authorize a production change, migration, generated artifact,
-commit, push, or merge.
+This plan records implementation order and status; it does not authorize
+Milestone 4 or change the frozen M3 contract.
 
 ## Frozen prerequisites
 
@@ -29,9 +30,9 @@ commit, push, or merge.
   mTLS or TLS early data.
 - Only `GET`, `HEAD`, and `OPTIONS` follow redirects. Every hop is revalidated and
   cross-origin credentials/secret-derived headers are removed.
-- The current HTTP stack can satisfy selected-IP dialing plus original-host
-  authority/SNI under its locked version, but the seam is version-coupled and
-  requires the M3-03 feasibility gate before adapter implementation.
+- The integrated HTTP adapter satisfies selected-IP dialing plus original-host
+  authority/SNI under its locked version. The seam is version-coupled, so M3-06
+  and future dependency upgrades must re-run the feasibility gate.
 - Queue deliveries, HTTP attempt sequences, redirect hops, and trace retries are
   distinct. A redirect chain remains within one configured attempt.
 - M4 owns evaluation and baseline semantics; M5 owns Tempo reconciliation.
@@ -56,15 +57,14 @@ persistence, API, migration, and focused-test paths. Security/QA review is
 read-only unless given exclusive acceptance files. Generated artifacts are never
 edited concurrently with backend schemas.
 
-Reserved migrations, subject to confirmation in the first authorized worktree:
+Integrated migrations:
 
 - `0007_execution_materialization`: expand the M1 execution envelope and add
   execution items plus idempotency records for M3-01;
 - `0008_attempt_observations`: add attempts, replay links, dispatch certainty,
   response artifacts, constraints, and indexes for M3-02/M3-04.
-
-If actual migration heads differ at implementation start, the coordinator
-renumbers before any writer begins. No slice invents an alternate revision ID.
+- `0009_attempt_response_outcomes`: add durable response/transport outcome fields
+  and constraints required by M3-03/M3-04.
 
 ## M3-00 — Contract freeze
 
@@ -75,10 +75,11 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
 - **Acceptance:** All three owner-requested clarifications are explicit; ADR 0007
   is extended rather than rewritten; M2 history is unchanged; docs have no
   unresolved state/TLS contradiction; no production or generated file changes.
-- **Status:** Architecture approved and documentation prepared. Publication is
-  pending separate commit/push authorization.
+- **Status:** Integrated at `3a83e26`.
 
 ## M3-01 — Atomic execution creation and immutable materialization
+
+- **Status:** Integrated at `a12744c`.
 
 - **Objective:** Create one test or ordered suite execution without target I/O.
 - **Dependencies:** Published M3-00 documentation and explicit implementation
@@ -101,6 +102,8 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
 
 ## M3-02 — Preparation and protected observation persistence
 
+- **Status:** Integrated at `26f92c2`.
+
 - **Objective:** Add the frozen attempt lifecycle, in-memory request preparation,
   deterministic fingerprints, and bounded redaction without sending HTTP.
 - **Dependencies:** Integrated M3-01 and frozen adapter ports.
@@ -119,6 +122,8 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
 - **Out of scope:** Actual DNS/TLS/HTTP and recovery-driven replay.
 
 ## M3-03 — Safe HTTP adapter
+
+- **Status:** Integrated at `becbc55`.
 
 - **Objective:** Produce one bounded transport result through an explicit port,
   with DNS pinning, verified TLS, redirect safety, and no hidden retry/proxy path.
@@ -142,6 +147,8 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
 
 ## M3-04 — Fenced dispatch orchestration and recovery
 
+- **Status:** Integrated at `4264e63`.
+
 - **Objective:** Connect durable job delivery to prepared attempts and the HTTP
   adapter without conflating redelivery with replay.
 - **Dependencies:** Integrated M3-02 and M3-03.
@@ -159,6 +166,8 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
 
 ## M3-05 — Execution and attempt reads plus typed contract handoff
 
+- **Status:** Integrated at `95a3a86`.
+
 - **Objective:** Publish only implemented execution/result contracts and prove
   bounded redacted consumption.
 - **Dependencies:** Integrated M3-01 through M3-04.
@@ -175,6 +184,8 @@ renumbers before any writer begins. No slice invents an alternate revision ID.
   and coordinator-owned regeneration verification.
 
 ## M3-06 — Independent acceptance and milestone integration
+
+- **Status:** Pending.
 
 - **Objective:** Establish the exact integrated M3 candidate and independently
   verify every roadmap and frozen-contract criterion.
@@ -203,9 +214,8 @@ Successful checks never authorize commit, push, merge, remote settings, or the
 next milestone. M3 PASS requires an integrated candidate, independent acceptance,
 full local evidence, and the required remote workflow evidence for that exact SHA.
 
-## Start conditions
+## Next action
 
-M3-01 is ready for a separately authorized task packet after the M3-00
-documentation candidate is reviewed and published. M3-03 additionally requires
-its locked-stack feasibility gate. No other unresolved architecture decision
-blocks M3-01.
+Run M3-06 against the integrated M3-05 candidate. Do not start M4 until the
+independent review, PostgreSQL/migration/contract gates, full Compose acceptance,
+and required remote CI evidence establish a Milestone 3 **PASS**.

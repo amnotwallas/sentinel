@@ -2,11 +2,15 @@
 
 ## Scope
 
-Milestone 1 implements the PostgreSQL queue from ADR 0002 and an internal probe
-handler. Only execution envelopes and jobs exist. The probe checkpoints
-`queued -> running -> completed` and sends no target HTTP request. Its completed
-envelope has no functional verdict; platform failure produces
-`failed`/`not_evaluated`.
+Sentinel uses the PostgreSQL queue from ADR 0002 for the internal probe and real
+execution jobs. The API atomically persists an execution, its pinned immutable
+inputs, materialized items, optional idempotency record, and queue job. The worker
+then prepares and dispatches bounded HTTP requests, records fenced attempts and
+redacted observations, and resumes from durable checkpoints after interruption.
+
+The internal probe remains a deployment smoke tool and sends no target request.
+Assertion/baseline evaluation and Tempo reconciliation are not implemented yet;
+successful M3 observations therefore remain `not_evaluated` until Milestone 4.
 
 ## Transaction and dependency boundaries
 
@@ -16,9 +20,16 @@ envelope has no functional verdict; platform failure produces
   application interface consumed by the worker and internal probe CLI.
 - `persistence.queue.PostgresJobStore` implements the port. It owns one session
   and one short transaction per operation and rolls back on exceptions.
+- `execution.orchestration.ExecutionOrchestrator` owns recovery and dispatch
+  decisions. `persistence.orchestration.PostgresOrchestrationStore` checkpoints
+  attempts and results with the live job fence.
 - Queue insertion and its execution envelope commit in one transaction.
 - Claim commits before handler invocation. No database transaction remains open
   across handler work or heartbeat waiting.
+- Request preparation and every durable checkpoint use short transactions. DNS,
+  TLS, and target HTTP I/O run with no database transaction open.
+- The worker commits `dispatching` with `possibly_sent`, request fingerprint,
+  trace ID, and client span ID before DNS resolution or socket activity.
 - Start, completion, retry, and failure first lock/validate the owned job. Subject
   transitions then lock the execution, always in that order.
 - Terminal job/execution writes commit atomically. There is no detached subject
@@ -77,8 +88,9 @@ The worker starts a heartbeat task independently of handler work. Heartbeat
 failure cancels the handler and leaves the lease for recovery. SIGINT/SIGTERM
 cancels active work and stops claiming new jobs. Cancellation is cooperative:
 handlers must await and stop when cancelled; a detached thread or remote effect
-cannot be undone by cancelling an asyncio task. This milestone's handler performs
-no external side effect.
+cannot be undone by cancelling an asyncio task. The execution handler can produce
+an outbound HTTP effect, so recovery consults the durable attempt state and
+dispatch certainty instead of assuming cancellation prevented the request.
 
 The database adapter converts operational driver errors to a sanitized
 `InfrastructureFailure`. Handler infrastructure failures are eligible for bounded
@@ -89,15 +101,18 @@ durable state. Raw exception messages are not logged or stored.
 Polling is authoritative and no `LISTEN/NOTIFY` optimization is implemented.
 Therefore notification loss cannot hide queued work.
 
-Future HTTP execution must consult durable attempt state and replay policy before
-sending a request. Queue redelivery alone never authorizes HTTP replay. That
-behavior belongs to Milestone 3 and ADR 0007.
+Queue redelivery alone never authorizes HTTP replay. Recovery before the dispatch
+checkpoint resumes without sending an extra request. A stored response or known
+transport failure resumes without resend. An ambiguous safe request creates a new
+attempt; an ambiguous unsafe request becomes `indeterminate` unless its immutable
+definition explicitly permits replay. Every replay receives new attempt, trace,
+and client span identifiers. See ADRs 0007 and 0008 for the complete matrix.
 
 ## Health and observability
 
 - `/health/live`: always returns process liveness without dependency checks.
-- `/health/ready`: returns `200` only if PostgreSQL is accessible and the initial
-  migration is applied; returns `503` otherwise.
+- `/health/ready`: returns `200` only if PostgreSQL is accessible and the database
+  is at the deployed Alembic head; returns `503` otherwise.
 - Tempo `/ready` is checked with a 1-second timeout and reported as
   `available`/`unavailable`; it does not determine API readiness.
 - Worker health uses a process-owned `/tmp/sentinel-worker-health` marker updated
@@ -108,8 +123,10 @@ JSON log events include job IDs and fixed event names. They exclude tokens,
 database URLs, exception dumps, requests, and bodies. API request and worker
 handler boundaries emit OpenTelemetry spans. An optional OTLP/HTTP exporter
 sends to Tempo; native runs without `SENTINEL_OTLP_ENDPOINT` create SDK spans with
-no exporter. Export failure does not determine job results. Full database/HTTP
-instrumentation and trace reconciliation remain in Milestone 5.
+no exporter. Each dispatched attempt creates a W3C client context and injects
+Sentinel correlation baggage. Export failure does not determine job results.
+Tempo lookup, delayed-ingestion handling, linked-trace discovery, and correlation
+status remain in Milestone 5.
 
 ## Recovery and inspection
 
@@ -129,17 +146,16 @@ Fencing tokens are internal ownership evidence and should not be shared.
 
 ## Accepted limitations
 
-- One active handler per worker process in this milestone. Horizontal production
-  worker scaling and outbound HTTP concurrency arrive only with later scope.
+- One active handler runs per worker process. The MVP does not provide distributed
+  runners or horizontal autoscaling.
 - Polling, row churn, and vacuum/index maintenance share PostgreSQL capacity with
   product queries.
 - Database downtime pauses new work and invalidates unconfirmed active ownership.
-- Queue history is not cleaned up yet; retention is Milestone 7. Probe records
-  should be kept small in development.
-- The initial `jobs.subject_id` has a foreign key to the only supported subject,
-  `executions`. New job subject types need an explicit migration when introduced.
-- Minimal envelopes have no project/revision references yet. Milestones 2–3 add
-  those fields through reviewed migrations.
+- Queue and execution history are not cleaned up yet; retention is Milestone 7.
+- `jobs.subject_id` references executions. New job subject types need an explicit
+  migration when introduced.
+- Functional assertion/baseline verdicts and trace correlation are not available
+  until Milestones 4 and 5.
 - A full Compose run requires Docker. Native PostgreSQL tests do not prove image
   builds or container health checks; CI covers that independent acceptance path.
 

@@ -55,10 +55,10 @@ was accepted without independently retrieving GitHub Actions. It establishes the
 overall workflow conclusion; individual backend and Compose job conclusions were
 not separately supplied or recorded. The detailed acceptance mapping is in the
 [Milestone 2 implementation ledger](implementation/milestone-2.md), and the
-planning-only transition is in the
-[Milestone 3 handoff](development/milestone-3-handoff.md). M3-00 architecture and
-security contracts are frozen; production implementation has not started and
-requires separate authorization.
+transition is in the
+[Milestone 3 handoff](development/milestone-3-handoff.md). M3-00 through M3-05
+are integrated on `main`; M3-06 independent acceptance is the remaining gate.
+Milestone 3 is not yet accepted, and Milestone 4 has not started.
 
 ### Goal
 
@@ -149,14 +149,15 @@ Create reproducible, immutable inputs for later executions.
 
 ## Milestone 3: Safe execution lifecycle and HTTP adapter
 
-M3-00 is complete at the contract-design level. The repository owner accepted
+The repository owner accepted
 [ADR 0008](architecture/ADRs/0008-http-dispatch-outcomes-and-tls-policy.md) and
 the frozen [Milestone 3 implementation contract](implementation/milestone-3.md)
-on 2026-10-17. The approved contract adds `transport_failed` and explicit
-dispatch certainty, resolves DNS only after the durable dispatch checkpoint,
-requires verified TLS 1.2 or newer, disables target proxy inheritance and
-connection pooling, and limits redirect following to safe methods. This status
-does not authorize M3-01, migrations, production changes, or publication.
+on 2026-10-17. M3-01 through M3-05 are integrated on `main`, ending at
+`95a3a86812876c9fa0b0730f4316e836a868684a`. The implementation now provides
+atomic execution creation, protected attempt persistence, a DNS-pinned HTTP
+adapter, fenced worker orchestration/recovery, and execution/attempt read APIs.
+M3-06 independent acceptance, complete local evidence, and final CI evidence for
+the exact candidate remain required before Milestone 3 can be marked **PASS**.
 
 ### Goal
 
