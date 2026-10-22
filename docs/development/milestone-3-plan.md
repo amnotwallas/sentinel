@@ -3,8 +3,9 @@
 Milestone 3 contract design was frozen by the repository owner as M3-00 on
 2026-10-17 from baseline `75daa258eac7dd11d26c2e9ce4af945a74e5a41b`.
 M3-01 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 independent acceptance is the
-only remaining task before a Milestone 3 **PASS** decision.
+`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 local acceptance completed on
+2026-10-21; publication and remote CI for that acceptance candidate remain before
+a Milestone 3 **PASS** decision.
 
 Scope and exit criteria come from the
 [roadmap](../ROADMAP.md#milestone-3-safe-execution-lifecycle-and-http-adapter).
@@ -185,7 +186,7 @@ Integrated migrations:
 
 ## M3-06 — Independent acceptance and milestone integration
 
-- **Status:** Pending.
+- **Status:** Local acceptance complete; publication and exact-candidate CI pending.
 
 - **Objective:** Establish the exact integrated M3 candidate and independently
   verify every roadmap and frozen-contract criterion.
@@ -216,6 +217,6 @@ full local evidence, and the required remote workflow evidence for that exact SH
 
 ## Next action
 
-Run M3-06 against the integrated M3-05 candidate. Do not start M4 until the
-independent review, PostgreSQL/migration/contract gates, full Compose acceptance,
-and required remote CI evidence establish a Milestone 3 **PASS**.
+Publish the reviewed M3-06 acceptance candidate only with separate authorization,
+then verify all required remote CI jobs against its exact SHA. Do not start M4
+until that evidence establishes a Milestone 3 **PASS**.

@@ -3,9 +3,10 @@
 Contract status: **FROZEN**. The repository owner approved M3-00 on 2026-10-17
 from baseline `75daa258eac7dd11d26c2e9ce4af945a74e5a41b`. Implementation status:
 M3-01 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`; M3-06 independent acceptance is
-pending. The frozen contract remains normative and this status update does not
-authorize Milestone 4 or alter accepted architecture.
+`95a3a86812876c9fa0b0730f4316e836a868684a`; M3-06 local acceptance completed on
+2026-10-21. Publication and exact-candidate CI remain pending. The frozen contract
+remains normative and this status update does not authorize Milestone 4 or alter
+accepted architecture.
 
 Normative inputs are [AGENTS.md](../../AGENTS.md), the [MVP](../MVP.md),
 [roadmap](../ROADMAP.md), [architecture](../architecture/README.md), accepted ADRs
@@ -23,7 +24,7 @@ state and TLS-policy checkpoints without rewriting M2 history.
 | M3-03 — HTTP adapter         | `becbc5517c1e7ea94167e95ae64b615f9cf85ea2` | DNS-pinned dispatch, target policy, TLS, redirect, timeout, and capture controls are implemented. |
 | M3-04 — Worker orchestration | `4264e63443c76e24c47e626cb4dea5c28588fd40` | Resumable fenced dispatch, recovery, and conservative replay are implemented.                     |
 | M3-05 — Read APIs            | `95a3a86812876c9fa0b0730f4316e836a868684a` | Execution/attempt reads and generated client contracts are implemented.                           |
-| M3-06 — Acceptance           | Pending                                    | Independent review, full local gates, Compose, and final CI evidence remain.                      |
+| M3-06 — Acceptance           | Local PASS; remote pending                 | Independent review and local gates pass; publication and exact-candidate CI remain.               |
 
 Slice commits record implementation integration, not milestone acceptance. A
 final M3 **PASS** still requires the evidence defined in this packet and the

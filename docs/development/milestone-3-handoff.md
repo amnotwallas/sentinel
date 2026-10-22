@@ -1,17 +1,18 @@
 # Milestone 3 acceptance handoff
 
 Status: M3-00 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 independent acceptance is the
-remaining Milestone 3 task. Milestone 2 remains accepted with status **PASS** at
-`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. This handoff records implementation
-state; it does not declare Milestone 3 complete or authorize Milestone 4.
+`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 local acceptance completed on
+2026-10-21 from base `76ed18c9d816650af1c0d9b4fad0381a6cdedd70`; publication
+and remote CI for the acceptance candidate remain. Milestone 2 remains accepted
+with status **PASS** at `6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. This handoff
+does not declare Milestone 3 complete or authorize Milestone 4.
 
-The repository owner supplied the accepted remote evidence for that SHA:
-[GitHub Actions run 38971960329](https://github.com/amnotwallas/sentinel/actions/runs/38971960329),
-triggered by a push to `main`, concluded `success` in 1 minute 28 seconds. The
-explicit frontend detail was 2 Vitest files and 9 tests passed. The run was not
-independently retrieved, and individual backend and Compose job conclusions were
-not separately supplied.
+The repository owner supplied remote evidence for base SHA `76ed18c`: workflow
+`checks` concluded `success`; Backend and PostgreSQL, Frontend and Contracts, and
+Docker Compose all passed. Reported counts were 247 non-integration backend tests,
+152 PostgreSQL integration tests, 399 aggregate backend tests in 31.21 seconds,
+and 10 frontend Vitest tests. This report was not independently retrieved and is
+not CI evidence for the unpublished acceptance candidate.
 
 ## Normative inputs
 
@@ -123,10 +124,11 @@ The integrated sequence and remaining acceptance gate are:
    `95a3a86`. Publish only
    implemented runtime schemas, regenerate artifacts once under coordinator
    ownership, and verify bounded redacted outputs.
-7. **M3-06 — Independent acceptance and milestone integration.** **Pending.** Exercise single
-   tests and ordered suites, termination at every checkpoint, ambiguity/replay,
-   target-policy attacks, privacy sinks, PostgreSQL/migration/contract gates, full
-   Compose, and final CI on the exact integrated SHA.
+7. **M3-06 — Independent acceptance and milestone integration.** **Local acceptance
+   complete; remote pending.** Single tests and ordered suites, checkpoint
+   termination, ambiguity/replay, target-policy attacks, privacy sinks,
+   PostgreSQL/migration/contract gates, and full Compose passed locally. Final CI
+   on the exact published candidate remains.
 
 ## Ownership and verification handoff
 
@@ -149,10 +151,45 @@ The integrated sequence and remaining acceptance gate are:
   workflow rules. Test success never grants commit, push, merge, or remote-setting
   permission.
 
+## M3-06 local acceptance evidence — 2026-10-21
+
+- **Candidate isolation:** branch `test/m3-06-acceptance` in a dedicated worktree
+  from base `76ed18c9d816650af1c0d9b4fad0381a6cdedd70`, with disposable database
+  `sentinel_m3_acceptance_test` and isolated Compose project
+  `sentinel-m3-06-76ed18c`.
+- **Acceptance gap closed:** 39 focused tests use local synthetic TLS peers and
+  deterministic adapters to cover additive trust, untrusted/expired/hostname
+  certificate rejection, original Host and SNI with selected-IP dialing, fresh
+  connections, TLS policy, the locked httpcore seam, conservative transport
+  classifications, 3xx rules, redirect denial, and alternate loopback/metadata
+  address forms. All 39 passed in 9.40 seconds after the final fixture update.
+- **Fast and contract gates:** `make check-fast` passed Ruff lint/format, strict
+  mypy, 286 non-integration backend tests, ESLint, Prettier, TypeScript, 10 Vitest
+  tests, the production frontend build, runtime OpenAPI/generated TypeScript drift,
+  the planned contract inventory (16 operations, 121 schemas, 74 fixture cases),
+  and repository tooling checks. `make check-compose-config` confirmed loopback
+  public bindings.
+- **PostgreSQL and migrations:** Alembic reported no pending model operations; all
+  438 backend tests passed against PostgreSQL in 31.30 seconds. Offline upgrade and
+  downgrade SQL was generated and reviewed, and the disposable database completed
+  `head -> base -> head`; `alembic check` passed and the final revision was `0009
+  (head)`.
+- **Compose:** the packaged API migration, image build, health-gated startup,
+  worker smoke, and frontend liveness probe passed. With Tempo stopped, API
+  readiness remained `ready`, PostgreSQL remained `available`, and Tempo was
+  reported `unavailable` as required.
+- **Security/privacy review:** no production code or public contract changed. The
+  only private key is deliberately public, synthetic, test-only material paired
+  with the local TLS fixture; no credential or production data was added. The
+  exercised denial paths do not echo rejected redirect locations.
+- **Remote evidence boundary:** the owner-reported green CI above applies to base
+  `76ed18c`, not this unpublished acceptance candidate. M3 remains short of final
+  **PASS** until the candidate is committed, published with explicit authorization,
+  and the required workflow succeeds for that exact SHA.
+
 ## Next action
 
-Run M3-06 against the exact integrated candidate. Record independent review,
-PostgreSQL and migration evidence, runtime/generated contract checks, privacy and
-transport results, full Compose acceptance, and the final remote CI jobs. Only
-then may the roadmap and implementation packet mark Milestone 3 **PASS** and hand
-off to Milestone 4.
+Review the local candidate, then obtain separate authorization to commit and push
+it. Verify every required remote CI job against that exact SHA. Only then may the
+roadmap and implementation packet mark Milestone 3 **PASS** and hand off to
+Milestone 4.

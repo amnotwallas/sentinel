@@ -15,6 +15,10 @@ credentials/
 *.jks
 id_rsa
 id_ed25519
+!backend/tests/fixtures/tls/synthetic_ca.pem
+!backend/tests/fixtures/tls/synthetic_server.pem
+!backend/tests/fixtures/tls/synthetic_expired_server.pem
+!backend/tests/fixtures/tls/synthetic_server.key
 
 # Python environments, caches, builds, and test output
 .venv/
