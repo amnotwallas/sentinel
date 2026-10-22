@@ -156,8 +156,9 @@ on 2026-10-17. M3-01 through M3-05 are integrated on `main`, ending at
 `95a3a86812876c9fa0b0730f4316e836a868684a`. The implementation now provides
 atomic execution creation, protected attempt persistence, a DNS-pinned HTTP
 adapter, fenced worker orchestration/recovery, and execution/attempt read APIs.
-M3-06 independent acceptance, complete local evidence, and final CI evidence for
-the exact candidate remain required before Milestone 3 can be marked **PASS**.
+M3-06 local acceptance completed on 2026-10-21, including the previously missing
+TLS/redirect/SSRF feasibility matrix. Publication and final CI evidence for the
+exact acceptance candidate remain before Milestone 3 can be marked **PASS**.
 
 ### Goal
 

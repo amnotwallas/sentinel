@@ -55,9 +55,9 @@ Sentinel is under active MVP development. The current `main` branch includes:
 
 The remaining MVP work includes deterministic assertion and baseline evaluation,
 Tempo trace reconciliation, the complete authoring/results UI, retention, and
-release hardening. Milestone 3 implementation currently reaches M3-05; its
-independent M3-06 acceptance is still pending. See the
-[roadmap](docs/ROADMAP.md) for the ordered delivery plan.
+release hardening. Milestone 3 local acceptance is complete; publication and CI
+for the acceptance candidate remain before the final M3 **PASS** and M4 handoff.
+See the [roadmap](docs/ROADMAP.md) for the ordered delivery plan.
 
 ## How it works
 
