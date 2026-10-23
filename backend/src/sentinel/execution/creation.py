@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
 from sentinel.persistence.attempts import PostgresAttemptStore
 from sentinel.persistence.models import (
+    BaselineActivationRow,
     EnvironmentRevisionRow,
     EnvironmentRow,
     ExecutionItemRow,
@@ -194,11 +195,19 @@ class PostgresExecutionService:
                         source_revision_id=source_revision_id,
                         status="queued",
                         verdict=None,
+                        result_contract_version=1,
                         created_at=now,
                     )
                 )
                 session.flush()
-                for ordinal, test_case_id, revision_id, revision_version in item_refs:
+                for (
+                    ordinal,
+                    test_case_id,
+                    revision_id,
+                    revision_version,
+                    baseline_activation_id,
+                    baseline_id,
+                ) in item_refs:
                     session.add(
                         ExecutionItemRow(
                             id=self.ids(),
@@ -210,6 +219,9 @@ class PostgresExecutionService:
                             test_case_revision_version=revision_version,
                             status="pending",
                             verdict=None,
+                            result_contract_version=1,
+                            baseline_activation_id=baseline_activation_id,
+                            baseline_id=baseline_id,
                             started_at=None,
                             finished_at=None,
                         )
@@ -252,7 +264,7 @@ class PostgresExecutionService:
 
     def _resolve_inputs(
         self, session: Session, command: ExecutionCreateCommand
-    ) -> tuple[UUID, UUID, str, UUID, list[tuple[int, UUID, UUID, int]]]:
+    ) -> tuple[UUID, UUID, str, UUID, list[tuple[int, UUID, UUID, int, UUID | None, UUID | None]]]:
         environment = session.scalar(
             select(EnvironmentRow)
             .where(EnvironmentRow.id == command.environment_id)
@@ -286,7 +298,24 @@ class PostgresExecutionService:
             )
             if revision is None:
                 raise ExecutionResourceNotFound
-            items = [(0, test_case.id, revision.id, revision.version)]
+            activation = session.scalar(
+                select(BaselineActivationRow).where(
+                    BaselineActivationRow.test_case_id == test_case.id,
+                    BaselineActivationRow.environment_id == environment.id,
+                    BaselineActivationRow.project_id == environment.project_id,
+                    BaselineActivationRow.deactivated_at.is_(None),
+                )
+            )
+            items = [
+                (
+                    0,
+                    test_case.id,
+                    revision.id,
+                    revision.version,
+                    activation.id if activation is not None else None,
+                    activation.baseline_id if activation is not None else None,
+                )
+            ]
             return (
                 environment.project_id,
                 environment_revision.id,
@@ -319,12 +348,38 @@ class PostgresExecutionService:
         )
         if not item_rows or len(item_rows) > 100:
             raise ExecutionResourceNotFound
+        test_case_ids = sorted({row.test_case_id for row in item_rows})
+        locked_test_cases = list(
+            session.scalars(
+                select(TestCaseRow)
+                .where(TestCaseRow.id.in_(test_case_ids))
+                .order_by(TestCaseRow.id)
+                .with_for_update()
+            )
+        )
+        if len(locked_test_cases) != len(test_case_ids):
+            raise ExecutionResourceNotFound
+        activations = {
+            activation.test_case_id: activation
+            for activation in session.scalars(
+                select(BaselineActivationRow).where(
+                    BaselineActivationRow.test_case_id.in_(test_case_ids),
+                    BaselineActivationRow.environment_id == environment.id,
+                    BaselineActivationRow.project_id == environment.project_id,
+                    BaselineActivationRow.deactivated_at.is_(None),
+                )
+            )
+        }
         items = [
             (
                 row.ordinal,
                 row.test_case_id,
                 row.test_case_revision_id,
                 row.test_case_revision_version,
+                activations[row.test_case_id].id if row.test_case_id in activations else None,
+                activations[row.test_case_id].baseline_id
+                if row.test_case_id in activations
+                else None,
             )
             for row in item_rows
         ]

@@ -10,9 +10,13 @@ from sqlalchemy.orm import sessionmaker
 
 from sentinel.persistence.database import deserialize_json, serialize_json
 from sentinel.persistence.models import (
+    BaselineActivationRow,
+    BaselineComparisonRow,
+    BaselineRow,
     ChangeEventRow,
     EnvironmentRevisionRow,
     EnvironmentRow,
+    EvaluationRow,
     ExecutionItemRow,
     ExecutionRow,
     IdempotencyRecordRow,
@@ -62,10 +66,15 @@ def engine() -> Iterator[Engine]:
     )
     with engine.begin() as conn:
         conn.execute(text("SET CONSTRAINTS fk_environments_active_revision DEFERRED"))
+        conn.execute(text("SET LOCAL sentinel.project_deletion = 'on'"))
         conn.execute(delete(IdempotencyRecordRow))
+        conn.execute(delete(EvaluationRow))
+        conn.execute(delete(BaselineComparisonRow))
         conn.execute(delete(ResponseArtifactRow))
         conn.execute(delete(TestAttemptRow))
         conn.execute(delete(ExecutionItemRow))
+        conn.execute(delete(BaselineActivationRow))
+        conn.execute(delete(BaselineRow))
         conn.execute(delete(JobRow))
         conn.execute(delete(ExecutionRow))
         conn.execute(delete(ChangeEventRow))

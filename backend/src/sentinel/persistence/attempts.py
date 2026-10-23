@@ -119,6 +119,7 @@ class PostgresAttemptStore:
                     id=attempt_id,
                     execution_item_id=execution_item_id,
                     sequence=int(sequence or 0) + 1,
+                    result_contract_version=item.result_contract_version,
                     state=AttemptState.PREPARED,
                     dispatch_certainty=DispatchCertainty.NOT_STARTED,
                     created_at=created,
