@@ -58,7 +58,10 @@ not separately supplied or recorded. The detailed acceptance mapping is in the
 transition is in the
 [Milestone 3 handoff](development/milestone-3-handoff.md). Milestone 3 is complete
 with status **PASS** at accepted implementation SHA
-`a41670b5c9da5410d0bd50d4ceaca495d23998bf`; Milestone 4 has not started.
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. M4-00 was accepted and frozen on
+2026-10-23 from published documentation base
+`b63c456148a626606dcc5568a3bae9d6a8fff3ff`; no M4 production slice is accepted
+yet.
 
 ### Goal
 
@@ -230,6 +233,15 @@ observations, before implementing baseline comparisons.
   future transport dependency upgrade must requalify that behavior.
 
 ## Milestone 4: Deterministic evaluation and baseline management
+
+Status: **M4-00 frozen and accepted; M4-01 not started**. Accepted decisions and
+executable acceptance criteria are in the
+[implementation packet](implementation/milestone-4.md), and the dependency order
+is in the [task plan](development/milestone-4-plan.md). Production implementation
+starts with M4-01 after the accepted documentation commit is integrated. M4-02's
+next migration is allocated in documentation as revision
+`0010_m4_evaluation_and_baselines` on parent `0009`; no migration is created by
+M4-00.
 
 ### Goal
 

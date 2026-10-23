@@ -1,12 +1,17 @@
 # Milestone 4 planning handoff
 
-Status: **planning only**. Milestones 1, 2, and 3 are accepted; the implementation
-baseline for M4 planning is `a41670b5c9da5410d0bd50d4ceaca495d23998bf`.
-Milestone 4 has not started. This handoff inventories accepted requirements,
-current implementation seams, unresolved decisions, and a proposed delivery
-order. It does not freeze a contract, allocate migrations, authorize production
-changes, or promote Milestone 2's future schemas into runtime compatibility
-surfaces.
+Status: **M4-00 frozen and accepted; M4-01 not started**.
+Milestones 1, 2, and 3 are accepted; the accepted M3 implementation remains
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`, and the published documentation
+base for M4-00 is `b63c456148a626606dcc5568a3bae9d6a8fff3ff`.
+This handoff preserves the inputs and questions supplied to M4-00. Their accepted
+resolutions are in the [M4 implementation packet](../implementation/milestone-4.md),
+[task plan](milestone-4-plan.md),
+[ADR 0009](../architecture/ADRs/0009-deterministic-evaluation-and-baseline-bootstrap.md),
+[ADR 0010](../architecture/ADRs/0010-baseline-api-persistence-and-provenance.md).
+Those documents freeze the M4-00 contract and allocate the next migration in
+documentation only; they do not change runtime compatibility surfaces or
+authorize production changes.
 
 ## Normative inputs
 
@@ -219,10 +224,12 @@ M4 acceptance must include:
     execution through evaluation, explicit promotion, later comparison, and
     rollback.
 
-## Unresolved decisions for M4-00
+## Questions resolved by M4-00
 
-These are not implementation choices and must be reviewed and frozen before M4
-creates compatibility surfaces:
+These were unresolved when this handoff was accepted. The accepted M4-00 packet
+supplies the answers below and keeps this list as the review checklist. Each item
+is traceable to executable acceptance criteria before M4 creates compatibility
+surfaces:
 
 1. **First-baseline bootstrap:** ADR 0004 requires an evaluated eligible attempt
    and declares `baseline_required` attempts ineligible, while the MVP needs an
@@ -266,7 +273,7 @@ If resolving any item changes accepted architecture rather than closing an
 unspecified wire/transaction detail, stop and add or supersede an ADR before
 implementation. Do not edit accepted ADR history.
 
-## Proposed implementation slices
+## Accepted implementation slices
 
 The sequence is deliberately mostly serial because the evaluator, persistence,
 worker transition, and public contract share compatibility decisions.
@@ -291,11 +298,11 @@ worker transition, and public contract share compatibility decisions.
 
 ### M4-02 — Evaluation and baseline persistence foundation
 
-- Add coordinator-allocated migration(s), domain ports, PostgreSQL repositories,
-  constraints, indexes, and transaction tests for attempt verdicts, the actual
-  baseline-comparison candidate/result, ordered evaluation records, immutable
-  baselines, and activation history. Freeze nullable/backfill handling for M3 rows
-  without retroactive evaluation.
+- Add the allocated Alembic revision `0010` on parent `0009`, domain ports,
+  PostgreSQL repositories, constraints, indexes, and transaction tests for
+  attempt verdicts, the actual baseline-comparison candidate/result, ordered
+  evaluation records, immutable baselines, and activation history. Freeze
+  nullable/backfill handling for M3 rows without retroactive evaluation.
 - Prove concurrent version allocation/activation, downgrade/re-upgrade, accepted
   M1-M3 data preservation, and actual-candidate association.
 - **Dependency:** M4-00 schema and transaction contract; consumes M4-01 value
@@ -311,21 +318,22 @@ worker transition, and public contract share compatibility decisions.
   duplication; replay predecessors remain excluded.
 - **Dependency:** integrated M4-01 and M4-02.
 
-### M4-04 — Baseline application services and API
+### M4-04 — Baseline application services
 
 - Implement explicit create/promote, list/history, and activate/rollback flows,
   including eligibility, fingerprint compatibility, optimistic concurrency,
   append-only change evidence, and stable safe problems.
-- This slice owns no M6 authoring UI and does not auto-promote.
+- Keep transport routes, runtime OpenAPI, and generated clients unchanged; this
+  slice owns no M6 authoring UI and does not auto-promote.
 - **Dependency:** evaluated-attempt and persistence contracts from M4-03.
 
-### M4-05 — Result contract and typed-client handoff
+### M4-05 — Baseline/result contract and typed-client handoff
 
-- Publish implemented evaluation/baseline fields and routes, update execution and
-  attempt reads with persisted verdict/comparison data, bounded evidence, and
-  bounded relevant definition/baseline change evidence, regenerate runtime
-  OpenAPI and TypeScript once under coordinator ownership, and add frontend
-  client-consumption tests.
+- Publish baseline command/history routes together with implemented evaluation/
+  baseline fields, update execution and attempt reads with persisted verdict/
+  comparison data, complete pinned change anchors, and bounded contextual
+  definition/baseline change evidence, regenerate runtime OpenAPI and TypeScript
+  once under coordinator ownership, and add frontend client-consumption tests.
 - Reconcile only the approved parts of M2's future schemas; preserve historical
   planned artifacts unless M4-00 explicitly supersedes them with a new planned
   contract.
@@ -350,8 +358,10 @@ each sequential domain/persistence/application slice; frontend work begins only
 after the coordinator publishes the implemented generated contract. Independent
 QA/security review is read-only unless assigned exclusive acceptance files.
 
-The repository is ready to begin **M4-00 contract freeze** from `a41670b`.
-Production M4 implementation is not ready until the eight unresolved decisions
-are reviewed, any necessary architecture change is handled through a new ADR,
-and the frozen packet assigns exact files, migration parent/ID, test database,
-ports, and required gates.
+The M4-00 candidate prepared from documentation base `b63c456` passed independent
+contract review with no unresolved critical or important finding. The repository
+owner accepted ADRs 0009 and 0010 and the implementation packet on 2026-10-23.
+M4-02 is allocated Alembic revision `0010_m4_evaluation_and_baselines`, parent
+`0009_attempt_response_outcomes` (`0009`); this is documentation-only and creates
+no migration file. Per-slice databases, ports, and production authorization are
+allocated when each implementation slice begins.
