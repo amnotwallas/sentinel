@@ -56,9 +56,9 @@ overall workflow conclusion; individual backend and Compose job conclusions were
 not separately supplied or recorded. The detailed acceptance mapping is in the
 [Milestone 2 implementation ledger](implementation/milestone-2.md), and the
 transition is in the
-[Milestone 3 handoff](development/milestone-3-handoff.md). M3-00 through M3-05
-are integrated on `main`; M3-06 independent acceptance is the remaining gate.
-Milestone 3 is not yet accepted, and Milestone 4 has not started.
+[Milestone 3 handoff](development/milestone-3-handoff.md). Milestone 3 is complete
+with status **PASS** at accepted implementation SHA
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`; Milestone 4 has not started.
 
 ### Goal
 
@@ -149,16 +149,22 @@ Create reproducible, immutable inputs for later executions.
 
 ## Milestone 3: Safe execution lifecycle and HTTP adapter
 
-The repository owner accepted
+Milestone 3 is complete with status **PASS** at accepted implementation SHA
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. The repository owner accepted
 [ADR 0008](architecture/ADRs/0008-http-dispatch-outcomes-and-tls-policy.md) and
 the frozen [Milestone 3 implementation contract](implementation/milestone-3.md)
-on 2026-10-17. M3-01 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`. The implementation now provides
+on 2026-10-17. M3-00 through M3-06 are integrated on `main`. The implementation
+provides
 atomic execution creation, protected attempt persistence, a DNS-pinned HTTP
 adapter, fenced worker orchestration/recovery, and execution/attempt read APIs.
-M3-06 local acceptance completed on 2026-10-21, including the previously missing
-TLS/redirect/SSRF feasibility matrix. Publication and final CI evidence for the
-exact acceptance candidate remain before Milestone 3 can be marked **PASS**.
+M3-06 independent acceptance completed on 2026-10-21, including the process-crash,
+recovery, replay, fencing, TLS, redirect, SSRF, privacy, migration, contract, and
+Compose evidence recorded in the
+[acceptance handoff](development/milestone-3-handoff.md). The repository owner
+supplied exact-SHA GitHub Actions evidence for `a41670b`: workflow `checks` and
+its Backend and PostgreSQL, Frontend and Contracts, and Docker Compose jobs all
+concluded `success`. The report was accepted without independently retrieving
+GitHub Actions; its supplied and unavailable details are recorded in the handoff.
 
 ### Goal
 

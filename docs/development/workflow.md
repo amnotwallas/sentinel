@@ -4,9 +4,9 @@ This is a developer collaboration guide, not a change to the product architectur
 [AGENTS.md](../../AGENTS.md), the [MVP](../MVP.md), [architecture](../architecture/README.md),
 accepted ADRs, and [roadmap](../ROADMAP.md) remain authoritative. The
 [audit](workflow-audit.md) records evidence and unapplied recommendations;
-the [Milestone 3 plan](milestone-3-plan.md) records the current implementation
-sequence and remaining acceptance gate. Earlier milestone plans remain historical
-ledgers.
+the [Milestone 4 planning handoff](milestone-4-handoff.md) records the current
+pre-contract scope, open decisions, and proposed sequence. Milestone 3 and earlier
+plans remain historical ledgers.
 
 ## Roles and ownership
 

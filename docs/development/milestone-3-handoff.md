@@ -1,18 +1,20 @@
 # Milestone 3 acceptance handoff
 
-Status: M3-00 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 local acceptance completed on
-2026-10-21 from base `76ed18c9d816650af1c0d9b4fad0381a6cdedd70`; publication
-and remote CI for the acceptance candidate remain. Milestone 2 remains accepted
-with status **PASS** at `6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`. This handoff
-does not declare Milestone 3 complete or authorize Milestone 4.
+Status: **PASS**. M3-00 through M3-06 are complete on `main` at accepted
+implementation SHA `a41670b5c9da5410d0bd50d4ceaca495d23998bf`. M3-06 local
+acceptance completed on 2026-10-21 from base
+`76ed18c9d816650af1c0d9b4fad0381a6cdedd70` and was integrated through acceptance
+commit `4b4193ad50f39d4e174a82dd769e0194b17da8cb`. Milestone 2 remains
+accepted with status **PASS** at
+`6b83adf0b8c9d9dcb0bba668a9e15d8ff0b4d715`; its historical record is unchanged.
 
-The repository owner supplied remote evidence for base SHA `76ed18c`: workflow
-`checks` concluded `success`; Backend and PostgreSQL, Frontend and Contracts, and
-Docker Compose all passed. Reported counts were 247 non-integration backend tests,
-152 PostgreSQL integration tests, 399 aggregate backend tests in 31.21 seconds,
-and 10 frontend Vitest tests. This report was not independently retrieved and is
-not CI evidence for the unpublished acceptance candidate.
+The repository owner previously supplied remote evidence for base SHA `76ed18c`:
+workflow `checks` concluded `success`; Backend and PostgreSQL, Frontend and
+Contracts, and Docker Compose all passed. Reported counts were 247 non-integration
+backend tests, 152 PostgreSQL integration tests, 399 aggregate backend tests in
+31.21 seconds, and 10 frontend Vitest tests. This report was not independently
+retrieved and is historical pre-acceptance evidence, not the final M3 acceptance
+evidence below.
 
 ## Normative inputs
 
@@ -82,7 +84,7 @@ telemetry must not alter functional execution outcomes.
    of MVP scope.
 5. The integrated HTTPX/httpcore adapter dials a selected IP while retaining the
    original authority and SNI/hostname verification through a narrow
-   version-qualified seam. M3-06 must independently requalify this behavior;
+   version-qualified seam. M3-06 independently requalified this behavior;
    dependency upgrades require the same gate and may not fall back to hostname
    re-resolution.
 6. Execution, item, attempt, artifact, idempotency, and job transaction boundaries
@@ -95,9 +97,9 @@ A material change to these contracts requires an ADR/product update before
 implementation. Runtime OpenAPI and generated clients are published only with
 implemented slices.
 
-## Approved delivery sequence
+## Accepted delivery sequence
 
-The integrated sequence and remaining acceptance gate are:
+The accepted integrated sequence was:
 
 1. **M3-00 — Freeze execution contracts and recovery cases.** Integrated at
    `3a83e26`. ADR 0008, the M3 packet, named acceptance cases, transaction
@@ -124,11 +126,11 @@ The integrated sequence and remaining acceptance gate are:
    `95a3a86`. Publish only
    implemented runtime schemas, regenerate artifacts once under coordinator
    ownership, and verify bounded redacted outputs.
-7. **M3-06 — Independent acceptance and milestone integration.** **Local acceptance
-   complete; remote pending.** Single tests and ordered suites, checkpoint
+7. **M3-06 — Independent acceptance and milestone integration.** **Complete.**
+   Single tests and ordered suites, checkpoint
    termination, ambiguity/replay, target-policy attacks, privacy sinks,
-   PostgreSQL/migration/contract gates, and full Compose passed locally. Final CI
-   on the exact published candidate remains.
+   PostgreSQL/migration/contract gates, and full Compose passed locally. The
+   acceptance candidate was integrated and exact-candidate CI passed.
 
 ## Ownership and verification handoff
 
@@ -146,10 +148,10 @@ The integrated sequence and remaining acceptance gate are:
   backend/frontend/contract gates as applicable, real PostgreSQL and migration
   round trips for persistence, security review for request/secret/network paths,
   and the task-owned full Compose gate at integration.
-- A final M3 PASS requires the exact integrated candidate identity, complete local
+- M3 PASS required the exact integrated candidate identity, complete local
   evidence, independent review resolution, and remote CI evidence under the
-  workflow rules. Test success never grants commit, push, merge, or remote-setting
-  permission.
+  workflow rules. Those requirements are satisfied at `a41670b`; test success
+  does not grant future commit, push, merge, or remote-setting permission.
 
 ## M3-06 local acceptance evidence — 2026-10-21
 
@@ -182,14 +184,35 @@ The integrated sequence and remaining acceptance gate are:
   only private key is deliberately public, synthetic, test-only material paired
   with the local TLS fixture; no credential or production data was added. The
   exercised denial paths do not echo rejected redirect locations.
-- **Remote evidence boundary:** the owner-reported green CI above applies to base
-  `76ed18c`, not this unpublished acceptance candidate. M3 remains short of final
-  **PASS** until the candidate is committed, published with explicit authorization,
-  and the required workflow succeeds for that exact SHA.
+- **Publication:** acceptance commit `4b4193a` was merged to `main` as
+  `a41670b5c9da5410d0bd50d4ceaca495d23998bf`.
+
+## Exact-candidate GitHub Actions evidence
+
+The repository owner supplied matching evidence for workflow `checks`, branch/ref
+`main`, and exact commit `a41670b5c9da5410d0bd50d4ceaca495d23998bf`:
+
+- workflow conclusion: `success`;
+- Backend and PostgreSQL job: `success`;
+- Frontend and Contracts job: `success`;
+- Docker Compose job: `success`;
+- backend unit/contract pytest: 286/286 passed, 0 failed, 0 skipped;
+- PostgreSQL integration pytest: 152/152 passed, 0 failed, 0 skipped;
+- aggregate backend pytest: 438/438 passed, 0 failed, 0 skipped in 41.18 seconds;
+- frontend Vitest: 10/10 passed, 0 failed, 0 skipped.
+
+The report covers Ruff lint/format, strict mypy, migrations, schema drift,
+PostgreSQL-backed tests, OpenAPI/generated TypeScript drift, ESLint, Prettier,
+TypeScript, Vitest, the production frontend build, Compose configuration and
+binding checks, packaged migration, startup, worker smoke, and Tempo-outage
+readiness. Planned-contract validation and repository-tooling checks were not
+configured in this workflow; they passed in the local M3-06 `make check-fast`
+evidence above. No run URL/ID, attempt number, per-step log URL, workflow duration,
+or frontend duration unit was supplied. Per instruction, this record accepts the
+owner-supplied exact-SHA evidence without attempting credentialed retrieval.
 
 ## Next action
 
-Review the local candidate, then obtain separate authorization to commit and push
-it. Verify every required remote CI job against that exact SHA. Only then may the
-roadmap and implementation packet mark Milestone 3 **PASS** and hand off to
-Milestone 4.
+Proceed to the [Milestone 4 planning handoff](milestone-4-handoff.md). M4-00 must
+freeze its unresolved evaluation, baseline-selection, persistence, and wire
+contracts before production implementation begins.

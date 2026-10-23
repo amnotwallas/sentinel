@@ -18,11 +18,11 @@ The architecture favors auditable behavior over inference:
 The product contract and acceptance criteria are in [`../MVP.md`](../MVP.md).
 
 Current implementation status is tracked in the [roadmap](../ROADMAP.md).
-Milestones 1 and 2 are accepted, and Milestone 3 is integrated through M3-05 with
-M3-06 acceptance pending. The runtime includes versioned definitions, durable
-executions and attempts, safe HTTP dispatch/recovery, redacted observations, and
-execution read APIs. Evaluation/baselines, Tempo reconciliation, and the complete
-UI remain later milestones.
+Milestones 1, 2, and 3 are accepted; the Milestone 3 implementation is
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. The runtime includes versioned
+definitions, durable executions and attempts, safe HTTP dispatch/recovery,
+redacted observations, and execution read APIs. Evaluation/baselines, Tempo
+reconciliation, and the complete UI remain later milestones.
 
 The component responsibilities and data model below describe the complete MVP
 architecture. Sections that cover later milestones are target contracts, not a

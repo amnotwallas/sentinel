@@ -3,9 +3,10 @@
 Milestone 3 contract design was frozen by the repository owner as M3-00 on
 2026-10-17 from baseline `75daa258eac7dd11d26c2e9ce4af945a74e5a41b`.
 M3-01 through M3-05 are integrated on `main`, ending at
-`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 local acceptance completed on
-2026-10-21; publication and remote CI for that acceptance candidate remain before
-a Milestone 3 **PASS** decision.
+`95a3a86812876c9fa0b0730f4316e836a868684a`. M3-06 is integrated on `main`; the
+accepted Milestone 3 implementation is
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. M3-00 through M3-06 are complete and
+Milestone 3 has status **PASS**.
 
 Scope and exit criteria come from the
 [roadmap](../ROADMAP.md#milestone-3-safe-execution-lifecycle-and-http-adapter).
@@ -186,7 +187,9 @@ Integrated migrations:
 
 ## M3-06 — Independent acceptance and milestone integration
 
-- **Status:** Local acceptance complete; publication and exact-candidate CI pending.
+- **Status:** Complete at accepted implementation SHA
+  `a41670b5c9da5410d0bd50d4ceaca495d23998bf`; local acceptance and exact-candidate
+  CI passed.
 
 - **Objective:** Establish the exact integrated M3 candidate and independently
   verify every roadmap and frozen-contract criterion.
@@ -200,8 +203,10 @@ Integrated migrations:
   migration gates; runtime/generated contracts; full Compose.
 - **Evidence:** Exact candidate SHA or uncommitted fingerprint, commands/counts,
   migration SQL/up/down, security findings/resolutions, Compose identity, and—only
-  after separately authorized publication—remote workflow URL and actual job
-  evidence.
+  after separately authorized publication—remote workflow result and actual job
+  evidence. For the accepted candidate, the repository owner approved the
+  exact-SHA report without a run URL/ID; the unavailable details are explicit in
+  the [acceptance handoff](milestone-3-handoff.md).
 
 ## Verification policy
 
@@ -212,11 +217,12 @@ slice-owned PostgreSQL databases; network tests use local synthetic services and
 reserved ports. No test relies on sleep for lease or ingestion timing.
 
 Successful checks never authorize commit, push, merge, remote settings, or the
-next milestone. M3 PASS requires an integrated candidate, independent acceptance,
-full local evidence, and the required remote workflow evidence for that exact SHA.
+next milestone. M3 PASS required an integrated candidate, independent acceptance,
+full local evidence, and the required remote workflow evidence for that exact SHA;
+those requirements are satisfied at `a41670b5c9da5410d0bd50d4ceaca495d23998bf`.
 
 ## Next action
 
-Publish the reviewed M3-06 acceptance candidate only with separate authorization,
-then verify all required remote CI jobs against its exact SHA. Do not start M4
-until that evidence establishes a Milestone 3 **PASS**.
+Use the [Milestone 4 planning handoff](milestone-4-handoff.md) to complete M4-00
+contract freeze before changing production code, persistence, migrations, runtime
+OpenAPI, or generated clients.
