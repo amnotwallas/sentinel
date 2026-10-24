@@ -1,10 +1,12 @@
 # Milestone 5 implementation contract
 
-Status: **M5-00 contract freeze accepted**.
-This packet freezes M5-00 only. It authorizes no M5-01+ production code,
-migration, worker, API, frontend, generated artifact, CI, or runtime rollout. It
-turns the accepted architecture and [ADR 0011](../architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
-into independently testable slices.
+Status: **M5 complete — PASS** at accepted implementation SHA
+`18d72162c26575778ab94556d0f85c2c76ecc75d`.
+
+This packet records the frozen M5-00 contract, the completed M5-01 through
+M5-05 implementation slices, and the independently accepted M5-06 integrated
+candidate. It turns the accepted architecture and [ADR 0011](../architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
+into an implemented, tested, and closed milestone record.
 
 ## Scope and invariants
 
@@ -123,6 +125,40 @@ The following cases are mandatory before M5 can be marked PASS:
 11. retention/deletion tests prove reference cascade boundaries without baseline
     history mutation; and
 12. API, worker, PostgreSQL, target HTTP, and Tempo spans pass privacy canaries.
+
+## M5-06 integrated acceptance record
+
+M5-06 passed independent acceptance on the exact integrated candidate
+`18d72162c26575778ab94556d0f85c2c76ecc75d`. The repository owner supplied
+matching GitHub Actions success for Backend and PostgreSQL, Frontend and
+Contracts, and Docker Compose, with 551/551 backend tests and 12/12 frontend
+tests passing.
+
+The final live gate used disposable PostgreSQL 16 and Tempo 2.9.0 resources and
+the real Sentinel API, worker, target HTTP request, OTLP/HTTP ingestion path,
+Tempo direct lookup, Tempo indexed search, PostgreSQL persistence, and public
+Attempt API. The synthetic target received the actual `sentinel.attempt.id`
+baggage and exported a distinct linked trace. Tempo returned one stable exact
+search result, excluding the primary trace. The worker persisted the linked
+reference on its first lookup; the delayed primary became `available` on the
+fourth lookup. The attempt remained `evaluated` with verdict `passed` and only
+one target attempt.
+
+The disposable Tempo acceptance configuration used controlled block flushing
+and a seven-second synthetic target response delay so indexed visibility was
+established before correlation began. Sentinel's frozen 60-second deadline and
+`0,1,3,7,15,31,59` lookup schedule were not changed. PostgreSQL showed one
+primary and one linked reference, one succeeded correlation job with delivery
+count `1/3`, no cross-project linked rows, and no primary reuse as linked.
+
+The linked reference contained only bounded derived evidence and indirect
+provenance. Logs and Tempo spans contained no raw traces, bodies, protected
+headers, SQL, secrets, unsafe URLs, or arbitrary attributes. The disposable
+acceptance resources were removed after evidence capture.
+
+During local setup, `npm ci` reported two moderate npm audit vulnerabilities.
+No automatic remediation was run; dependency evaluation remains an
+operational follow-up.
 
 ## Explicit non-goals and implementation prerequisites
 

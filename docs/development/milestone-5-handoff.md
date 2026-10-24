@@ -1,11 +1,14 @@
 # Milestone 5 contract handoff
 
-Status: **M5-00 contract freeze accepted; M5-01+ implementation planning only**.
+Status: **M5 complete — PASS** at accepted implementation SHA
+`18d72162c26575778ab94556d0f85c2c76ecc75d`.
+
+M5-00 through M5-06 are complete. This handoff records the accepted contract,
+implemented capabilities, independent acceptance evidence, and the handoff into
+Milestone 6 UI planning. It authorizes no M6 or M7 production implementation.
 Milestone 4 is accepted with status **PASS** at implementation SHA
 `8e280be334b8fa71044005ad6557a3b91f0dd828`. This handoff records the accepted
-M5 contract and the implemented seams that M5-01 may build on. It authorizes no
-M5-01+ production code, migration execution, worker, API, frontend, generated
-artifact, CI, or runtime rollout.
+M5 contract and the completed implementation built on those seams.
 
 ## Authority and scope
 
@@ -38,7 +41,7 @@ trace UI, a replacement trace viewer, full trace storage in PostgreSQL,
 proprietary headers or agents, guaranteed discovery after broken propagation,
 root-cause claims, and the M7 retention worker.
 
-## Implemented starting point
+## M4 starting point (historical)
 
 The accepted M4 repository already provides these seams:
 
@@ -66,19 +69,11 @@ The accepted M4 repository already provides these seams:
   API unready. Functional execution and M4 regression classification have no
   Tempo dependency.
 
-The following M5 capabilities do not yet exist:
-
-- no `trace_references` persistence or correlation-state repository;
-- no `correlate_trace` job, deadline, lookup-attempt counter, or reconciliation
-  application service;
-- no Tempo query adapter or bounded response parser;
-- no persisted linked traces, service/deployment evidence, or Tempo navigation
-  links;
-- no trace-reference fields in `AttemptDetail`, runtime OpenAPI, or generated
-  TypeScript; and
-- no accepted instrumentation implementation for FastAPI requests, SQLAlchemy
-  calls, or Tempo queries. Merely constructing an API tracer provider does not
-  instrument those boundaries.
+M5 implemented and accepted the previously missing trace-reference persistence,
+fenced `correlate_trace` work, bounded direct Tempo adapter, capability-gated
+linked search, bounded evidence, safe Tempo links, additive Attempt API fields,
+generated OpenAPI/TypeScript contracts, and the approved safe API/worker/target/
+Tempo instrumentation boundaries.
 
 One schema constraint requires explicit M5 treatment: `jobs.subject_id` currently
 has a foreign key to `executions.id`, and the job store assumes every job subject
@@ -154,29 +149,68 @@ without an M5-00 persistence decision and migration.
 - Time, IDs, Tempo responses, capability detection, and retry scheduling must be
   injectable. Tests use no sleeps.
 
+## M5 closure record
+
+M5-06 independently passed on the exact candidate above. The owner confirmed
+matching CI success: Backend and PostgreSQL, Frontend and Contracts, and Docker
+Compose all succeeded, with 551/551 backend tests and 12/12 frontend tests.
+
+The final real journey used disposable PostgreSQL 16 and Tempo 2.9.0 resources.
+The target received Sentinel's actual attempt baggage and exported a distinct
+linked OTLP trace. Tempo's exact indexed search returned one stable linked
+result, excluding the primary. The worker persisted the linked reference on
+lookup 1 and the delayed primary reference became `available` on lookup 4;
+both references were returned primary-first by the public Attempt API. The
+execution produced one attempt and retained verdict `passed`.
+
+The acceptance environment used controlled Tempo block flushing and a seven-
+second synthetic target response delay to make indexing visible before
+correlation. Sentinel's 60-second deadline and `0,1,3,7,15,31,59` schedule were
+unchanged. PostgreSQL showed one primary, one linked reference, one succeeded
+correlation job with delivery count `1/3`, no cross-project linked rows, and no
+primary reuse as linked. Privacy scans found no raw traces, bodies, protected
+headers, SQL, secrets, unsafe URLs, or arbitrary attributes.
+
+The captured UTC checkpoints were: API execution request `04:46:50.348516Z`;
+dispatch checkpoint `04:46:50.925179Z`; linked OTLP export
+`04:46:50.936794Z`; response/terminal attempt `04:46:57.943212Z` /
+`04:46:57.945484Z`; first worker search and linked persistence
+`04:46:57.979177Z`; delayed primary availability on the fourth direct lookup
+`04:47:04.994927Z`–`04:47:04.998222Z`; and public Attempt API read around
+`04:47:05Z`. The attempt was execution
+`20723e12-3210-4ca4-93b3-5c39581dc979` / attempt
+`663cea82-e2f2-4434-aa0d-5d684d5c0652`; the persisted linked trace was
+`4050f9f0c086cf507afb8b7b665aa251` and the primary was
+`ba4d480ff08884deb6fd3a17aaa3e3e5`.
+
+Local `npm ci` reported two moderate npm audit vulnerabilities. No automatic
+remediation was attempted; dependency evaluation remains an operational
+follow-up.
+
 ## M5-00 resolution record
 
 The [M5 implementation contract](../implementation/milestone-5.md),
 [M5 task plan](milestone-5-plan.md), and [ADR 0011](../architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
 record the eleven approved decisions as one implementation contract. The
-contract is internally consistent with M1-M4 and is accepted for M5 planning;
-implementation still requires the slice-specific workflow gates below.
+contract is internally consistent with M1-M4 and is accepted for the completed
+M5 implementation. The slice-specific workflow gates below are now closed by
+the M5-06 acceptance record.
 Accepted ADR 0005 is not edited in place. The detailed checklist below remains
 the audit trail for each question.
 
 | Decision | Accepted resolution | Status |
 | --- | --- | --- |
-| Relational shape and migration | `trace_references` revision `0011` after `0010`; one primary, deduplicated linked rows, bounded JSON evidence, legacy fields preserved, no historical backfill | Accepted contract; implementation pending |
-| Queue subject and atomic enqueue | Keep execution `subject_id`; add nullable reference FK and unique `correlate_trace` row; create reference at dispatch and enqueue atomically at terminal checkpoint | Accepted contract; implementation pending |
-| Retry and exhaustion | 60-second terminal-relative deadline; `0,1,3,7,15,31,59` lookup seconds; outage remains `tempo_unavailable`, no trace at deadline becomes `expired` | Accepted contract; implementation pending |
-| Tempo wire protocol | Pinned Tempo 2.9.0 direct `/api/traces/{trace_id}`, optional tags search, bounded HTTP/TLS/size limits and closed errors | Accepted contract; implementation pending |
-| Available versus partial | Client span present and valid is `available`; trace without it or malformed/incomplete evidence is `partial`; downstream absence is unknown evidence | Accepted contract; implementation pending |
-| Linked discovery | Opt-in exact `sentinel.attempt.id`, capability-gated, max 16, deterministic ID ordering, indirect provenance only | Accepted contract; implementation pending |
-| Persisted evidence | Versioned 64 KiB allowlist, max 32 services/256 spans and same revision-scoped comparison anchor; no raw trace | Accepted contract; implementation pending |
-| Public API | Additive attempt-detail array, primary first and max 17, legacy fields retained, stored reads only, no M5 refresh route | Accepted contract; implementation pending |
-| Navigation URL | Internal URL never emitted; optional validated `{trace_id}` operator template, otherwise null | Accepted contract; implementation pending |
-| Instrumentation | Manual safe spans with closed attributes; no SQL/headers/URLs/bodies/exceptions/secrets | Accepted contract; implementation pending |
-| Retention handoff | References/evidence follow attempt metadata and cascade; Tempo retention independent; M7 owns cleanup/deletion/privacy scans | Accepted contract; implementation pending |
+| Relational shape and migration | `trace_references` revision `0011` after `0010`; one primary, deduplicated linked rows, bounded JSON evidence, legacy fields preserved, no historical backfill | Implemented and accepted |
+| Queue subject and atomic enqueue | Keep execution `subject_id`; add nullable reference FK and unique `correlate_trace` row; create reference at dispatch and enqueue atomically at terminal checkpoint | Implemented and accepted |
+| Retry and exhaustion | 60-second terminal-relative deadline; `0,1,3,7,15,31,59` lookup seconds; outage remains `tempo_unavailable`, no trace at deadline becomes `expired` | Implemented and accepted |
+| Tempo wire protocol | Pinned Tempo 2.9.0 direct `/api/traces/{trace_id}`, optional tags search, bounded HTTP/TLS/size limits and closed errors | Implemented and accepted |
+| Available versus partial | Client span present and valid is `available`; trace without it or malformed/incomplete evidence is `partial`; downstream absence is unknown evidence | Implemented and accepted |
+| Linked discovery | Opt-in exact `sentinel.attempt.id`, capability-gated, max 16, deterministic ID ordering, indirect provenance only | Implemented and accepted |
+| Persisted evidence | Versioned 64 KiB allowlist, max 32 services/256 spans and same revision-scoped comparison anchor; no raw trace | Implemented and accepted |
+| Public API | Additive attempt-detail array, primary first and max 17, legacy fields retained, stored reads only, no M5 refresh route | Implemented and accepted |
+| Navigation URL | Internal URL never emitted; optional validated `{trace_id}` operator template, otherwise null | Implemented and accepted |
+| Instrumentation | Manual safe spans with closed attributes; no SQL/headers/URLs/bodies/exceptions/secrets | Implemented and accepted |
+| Retention handoff | References/evidence follow attempt metadata and cascade; Tempo retention independent; M7 owns cleanup/deletion/privacy scans | Implemented and accepted |
 
 Any future change that affects an accepted architectural invariant requires an
 amended contract/new ADR before implementation.
@@ -245,8 +279,9 @@ recorded in the linked ADR sections and summarized in the resolution table.
 
 ## Implementation slices
 
-This ordering is recorded in the [M5 task plan](milestone-5-plan.md). It remains
-implementation planning until each slice passes its workflow gate.
+This ordering is recorded in the [M5 task plan](milestone-5-plan.md). Each slice
+passed its workflow gate; no additional M5 implementation is authorized by this
+closed handoff.
 
 ### M5-00 — Contract freeze and acceptance matrix — accepted
 
@@ -315,7 +350,7 @@ implementation planning until each slice passes its workflow gate.
 
 ## Required test and acceptance coverage
 
-M5-00 should turn the following into executable named cases:
+M5 acceptance turned the following into executable named cases:
 
 1. persisted primary trace/span IDs exactly match the injected `traceparent` and
    exported client span, including preserved unrelated baggage and rejected
@@ -373,16 +408,9 @@ frontend consumption; it does not require an M6 UI.
   pass on one exact candidate, followed by matching exact-SHA CI after separately
   authorized publication.
 
-## Readiness for M5-00
+## Readiness for Milestone 6
 
-This handoff is based on accepted M4 SHA
-`8e280be334b8fa71044005ad6557a3b91f0dd828`. Once this documentation-only closure
-is integrated, M5-00 is complete at the resulting documentation commit.
-Production implementation readiness is intentionally **not** granted: M5-01
-requires its own task packet and gates. M5-00 preserves one writer per file,
-coordinator ownership of migration allocation and generated contracts, separate
-disposable databases and ports, and independent
-architecture/API/persistence/recovery/privacy review.
-
-No M5-01+ production work, migration implementation, runtime API, worker,
-frontend, generated artifact, or CI change is authorized by this handoff.
+The M5 implementation and acceptance baseline for UI planning is
+`18d72162c26575778ab94556d0f85c2c76ecc75d`. The concise UI handoff is recorded
+in [milestone-6-handoff.md](milestone-6-handoff.md). M6 implementation remains
+unauthorized until its missing product and interaction decisions are resolved.

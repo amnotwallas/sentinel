@@ -67,8 +67,8 @@ Backend and PostgreSQL, Frontend and Contracts, and Docker Compose all concluded
 was accepted without independently retrieving GitHub Actions. The
 [Milestone 4 acceptance handoff](development/milestone-4-handoff.md) records the
 independent review, its corrected JSON response-classification defect, and the
-accepted evidence. Milestone 5 remains planning-only for implementation after
-the accepted M5-00 contract freeze; its inputs and slice gates are in the
+accepted evidence. Milestone 5 is now complete with status **PASS**; its
+implementation, acceptance evidence, and M6 transition are recorded in the
 [Milestone 5 contract handoff](development/milestone-5-handoff.md).
 
 ### Goal
@@ -288,11 +288,21 @@ explainable evidence and immutable baseline history.
 
 ## Milestone 5: Trace correlation and evidence
 
-Status: **M5-00 contract accepted; M5-01+ implementation planning only**. The
-[Milestone 5 contract handoff](development/milestone-5-handoff.md), [implementation contract](implementation/milestone-5.md),
-[task plan](development/milestone-5-plan.md), and accepted [ADR 0011](architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
-freeze the approved architecture. No M5 production implementation, migration
-execution, runtime API, worker, frontend, or generated artifact is present yet.
+Status: **PASS — complete** at accepted implementation SHA
+`18d72162c26575778ab94556d0f85c2c76ecc75d`. The [Milestone 5 contract
+handoff](development/milestone-5-handoff.md), [implementation
+contract](implementation/milestone-5.md), [task plan](development/milestone-5-plan.md),
+and accepted [ADR 0011](architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
+remain authoritative. All M5 slices and the independent M5-06 acceptance gate
+are complete.
+
+The owner confirmed exact-SHA GitHub Actions success for Backend and PostgreSQL,
+Frontend and Contracts, and Docker Compose, with 551/551 backend tests and
+12/12 frontend tests passing. The final disposable Compose journey used real
+Tempo 2.9.0 OTLP ingestion and indexed `sentinel.attempt.id` search through
+the actual correlation worker; the linked reference persisted without changing
+the functional verdict. The M5 handoff records the timing, persistence,
+privacy, and controlled-indexing evidence.
 
 ### Goal
 
@@ -334,6 +344,10 @@ Make direct trace correlation reliable and missing/partial telemetry graceful.
 ### Goal
 
 Expose the complete supported workflow without adding backend features.
+
+The preparation boundary and unresolved interaction decisions are recorded in
+the [Milestone 6 UI handoff](development/milestone-6-handoff.md). It does not
+authorize implementation.
 
 ### Deliverables
 

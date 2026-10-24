@@ -1,6 +1,11 @@
 # Milestone 5 task plan
 
-Status: **M5-00 contract freeze accepted; M5-01+ planning only**.
+Status: **M5 complete — PASS** at accepted implementation SHA
+`18d72162c26575778ab94556d0f85c2c76ecc75d`.
+
+M5-00 through M5-06 are complete. The frozen contract and slice boundaries
+remain authoritative; this plan records closure and does not authorize M6
+implementation.
 Base for the contract-freeze worktree: `18bee847789e83527d6eb48fe6667b40b9f628a3`.
 M5-01+ slices require the accepted M5-00 contract plus a workflow packet naming
 their own worktree, database, ports, owner, and write set.
@@ -94,9 +99,11 @@ concurrency tests, frontend contract tests, Compose delayed-ingestion trace
 journey, Tempo outage/restart, and exact generated-contract check. Do not claim
 PASS from documentation or inspection alone.
 
-**Exit:** owner-approved contract, independent review findings resolved, all
-required gates pass on one candidate, and separately authorized CI evidence is
-recorded for that exact SHA.
+**Exit:** achieved. Independent acceptance passed on
+`18d72162c26575778ab94556d0f85c2c76ecc75d`, including the real Tempo 2.9.0
+linked-trace worker journey, and the owner supplied matching exact-SHA CI
+success. See the [M5 closure handoff](milestone-5-handoff.md) and the
+[M6 UI handoff](milestone-6-handoff.md).
 
 ## Cross-slice ownership and handoff
 
