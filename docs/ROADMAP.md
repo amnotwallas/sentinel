@@ -67,9 +67,9 @@ Backend and PostgreSQL, Frontend and Contracts, and Docker Compose all concluded
 was accepted without independently retrieving GitHub Actions. The
 [Milestone 4 acceptance handoff](development/milestone-4-handoff.md) records the
 independent review, its corrected JSON response-classification defect, and the
-accepted evidence. Milestone 5 remains planning-only pending M5-00 contract
-freeze; its inputs and unresolved decisions are in the
-[Milestone 5 planning handoff](development/milestone-5-handoff.md).
+accepted evidence. Milestone 5 remains planning-only for implementation after
+the accepted M5-00 contract freeze; its inputs and slice gates are in the
+[Milestone 5 contract handoff](development/milestone-5-handoff.md).
 
 ### Goal
 
@@ -288,10 +288,11 @@ explainable evidence and immutable baseline history.
 
 ## Milestone 5: Trace correlation and evidence
 
-Status: **planning only**. The
-[Milestone 5 planning handoff](development/milestone-5-handoff.md) separates
-accepted architecture from decisions that M5-00 must freeze. No M5 schema, job,
-Tempo client, API, or generated contract is approved by this roadmap status.
+Status: **M5-00 contract accepted; M5-01+ implementation planning only**. The
+[Milestone 5 contract handoff](development/milestone-5-handoff.md), [implementation contract](implementation/milestone-5.md),
+[task plan](development/milestone-5-plan.md), and accepted [ADR 0011](architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
+freeze the approved architecture. No M5 production implementation, migration
+execution, runtime API, worker, frontend, or generated artifact is present yet.
 
 ### Goal
 

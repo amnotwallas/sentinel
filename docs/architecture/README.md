@@ -747,3 +747,4 @@ boundary and operator configuration remain part of the security model.
 - [ADR 0006: Secret handling, redaction, and retention](ADRs/0006-security-privacy-retention.md)
 - [ADR 0007: Conservative outbound execution safety](ADRs/0007-outbound-execution-safety.md)
 - [ADR 0008: HTTP dispatch outcomes and TLS policy](ADRs/0008-http-dispatch-outcomes-and-tls-policy.md)
+- [ADR 0011: Trace correlation and evidence contract](ADRs/0011-trace-correlation-and-evidence-contract.md)

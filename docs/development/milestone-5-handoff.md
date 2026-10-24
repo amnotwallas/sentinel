@@ -1,12 +1,11 @@
-# Milestone 5 planning handoff
+# Milestone 5 contract handoff
 
-Status: **planning only; M5-00 contract freeze required**. Milestone 4 is accepted
-with status **PASS** at implementation SHA
-`8e280be334b8fa71044005ad6557a3b91f0dd828`. This handoff inventories accepted
-requirements and the implemented seams that M5 may build on. It does not approve
-a migration, queue representation, Tempo wire adapter, retry schedule, persisted
-evidence shape, API response, configuration key, dependency, or generated
-contract.
+Status: **M5-00 contract freeze accepted; M5-01+ implementation planning only**.
+Milestone 4 is accepted with status **PASS** at implementation SHA
+`8e280be334b8fa71044005ad6557a3b91f0dd828`. This handoff records the accepted
+M5 contract and the implemented seams that M5-01 may build on. It authorizes no
+M5-01+ production code, migration execution, worker, API, frontend, generated
+artifact, CI, or runtime rollout.
 
 ## Authority and scope
 
@@ -155,11 +154,37 @@ without an M5-00 persistence decision and migration.
 - Time, IDs, Tempo responses, capability detection, and retry scheduling must be
   injectable. Tests use no sleeps.
 
-## Decisions M5-00 must freeze
+## M5-00 resolution record
 
-These are unresolved. The proposals below are review inputs, not accepted
-contracts. A choice that changes accepted architecture requires a new or
-superseding ADR; accepted ADR 0005 must not be edited in place.
+The [M5 implementation contract](../implementation/milestone-5.md),
+[M5 task plan](milestone-5-plan.md), and [ADR 0011](../architecture/ADRs/0011-trace-correlation-and-evidence-contract.md)
+record the eleven approved decisions as one implementation contract. The
+contract is internally consistent with M1-M4 and is accepted for M5 planning;
+implementation still requires the slice-specific workflow gates below.
+Accepted ADR 0005 is not edited in place. The detailed checklist below remains
+the audit trail for each question.
+
+| Decision | Accepted resolution | Status |
+| --- | --- | --- |
+| Relational shape and migration | `trace_references` revision `0011` after `0010`; one primary, deduplicated linked rows, bounded JSON evidence, legacy fields preserved, no historical backfill | Accepted contract; implementation pending |
+| Queue subject and atomic enqueue | Keep execution `subject_id`; add nullable reference FK and unique `correlate_trace` row; create reference at dispatch and enqueue atomically at terminal checkpoint | Accepted contract; implementation pending |
+| Retry and exhaustion | 60-second terminal-relative deadline; `0,1,3,7,15,31,59` lookup seconds; outage remains `tempo_unavailable`, no trace at deadline becomes `expired` | Accepted contract; implementation pending |
+| Tempo wire protocol | Pinned Tempo 2.9.0 direct `/api/traces/{trace_id}`, optional tags search, bounded HTTP/TLS/size limits and closed errors | Accepted contract; implementation pending |
+| Available versus partial | Client span present and valid is `available`; trace without it or malformed/incomplete evidence is `partial`; downstream absence is unknown evidence | Accepted contract; implementation pending |
+| Linked discovery | Opt-in exact `sentinel.attempt.id`, capability-gated, max 16, deterministic ID ordering, indirect provenance only | Accepted contract; implementation pending |
+| Persisted evidence | Versioned 64 KiB allowlist, max 32 services/256 spans and same revision-scoped comparison anchor; no raw trace | Accepted contract; implementation pending |
+| Public API | Additive attempt-detail array, primary first and max 17, legacy fields retained, stored reads only, no M5 refresh route | Accepted contract; implementation pending |
+| Navigation URL | Internal URL never emitted; optional validated `{trace_id}` operator template, otherwise null | Accepted contract; implementation pending |
+| Instrumentation | Manual safe spans with closed attributes; no SQL/headers/URLs/bodies/exceptions/secrets | Accepted contract; implementation pending |
+| Retention handoff | References/evidence follow attempt metadata and cascade; Tempo retention independent; M7 owns cleanup/deletion/privacy scans | Accepted contract; implementation pending |
+
+Any future change that affects an accepted architectural invariant requires an
+amended contract/new ADR before implementation.
+
+## Decision checklist (accepted contract)
+
+Each item below is retained as the original review prompt; its accepted answer is
+recorded in the linked ADR sections and summarized in the resolution table.
 
 1. **Relational shape and migration.** Freeze `trace_references` columns,
    constraints, indexes, ownership, deletion behavior, primary cardinality,
@@ -186,7 +211,7 @@ superseding ADR; accepted ADR 0005 must not be edited in place.
    image. Raw Tempo payloads and errors must not cross the adapter port.
 5. **Available versus partial.** Define the minimum validated span graph. ADR 0005
    requires the expected client span and treats incomplete expected context as
-   partial, but M5-00 must state whether a client span alone is `available`, which
+   partial, and the accepted M5-00 contract states whether a client span alone is `available`, which
    downstream/server evidence is expected, and how malformed, duplicate, or
    truncated span sets classify.
 6. **Linked discovery.** Freeze the opt-in configuration, exact indexed attribute
@@ -218,21 +243,20 @@ superseding ADR; accepted ADR 0005 must not be edited in place.
     states and safe provenance, but M7 retains ownership of cleanup execution,
     restartability, project deletion behavior, and release-wide privacy scans.
 
-## Proposed implementation slices
+## Implementation slices
 
-This ordering is recommended for review because persistence and state semantics
-control every later adapter and wire shape. It is not an approved task plan until
-M5-00 resolves the decisions above.
+This ordering is recorded in the [M5 task plan](milestone-5-plan.md). It remains
+implementation planning until each slice passes its workflow gate.
 
-### M5-00 — Contract freeze and acceptance matrix
+### M5-00 — Contract freeze and acceptance matrix — accepted
 
-- Freeze state transitions, schema/FKs, queue subject model, retry/deadline
+- Accepted state transitions, schema/FKs, queue subject model, retry/deadline
   semantics, Tempo adapter port, evidence bounds, API shapes, configuration, and
   named acceptance cases.
 - Reconcile ADR 0005's available/partial/deadline wording without rewriting it.
   Add or supersede an ADR only if the decision changes accepted architecture.
-- Produce a reviewed implementation packet and task plan. Do not create a
-  migration, route, generated artifact, or production adapter in this slice.
+- Produced the reviewed implementation packet and task plan. No migration,
+  route, generated artifact, or production adapter was created in this slice.
 
 ### M5-01 — Trace-reference and durable-work persistence
 
@@ -353,13 +377,12 @@ frontend consumption; it does not require an M6 UI.
 
 This handoff is based on accepted M4 SHA
 `8e280be334b8fa71044005ad6557a3b91f0dd828`. Once this documentation-only closure
-is reviewed and integrated, the repository is ready for M5-00; that task must
-record the resulting documentation commit as its actual base. Production
-readiness is intentionally **not** granted: the eleven decisions above must be
-resolved and reviewed first. M5-00 should preserve one writer per file,
+is integrated, M5-00 is complete at the resulting documentation commit.
+Production implementation readiness is intentionally **not** granted: M5-01
+requires its own task packet and gates. M5-00 preserves one writer per file,
 coordinator ownership of migration allocation and generated contracts, separate
 disposable databases and ports, and independent
 architecture/API/persistence/recovery/privacy review.
 
-No commit, push, merge, remote change, migration allocation, or M5 production
-work is authorized by this handoff.
+No M5-01+ production work, migration implementation, runtime API, worker,
+frontend, generated artifact, or CI change is authorized by this handoff.

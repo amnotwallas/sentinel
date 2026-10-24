@@ -6,10 +6,10 @@ accepted ADRs, and [roadmap](../ROADMAP.md) remain authoritative. The
 [audit](workflow-audit.md) records evidence and unapplied recommendations;
 the [Milestone 4 acceptance handoff](milestone-4-handoff.md) and
 [completed M4 task plan](milestone-4-plan.md) are historical ledgers. The
-[Milestone 5 planning handoff](milestone-5-handoff.md) records accepted M5 inputs,
-unresolved contract decisions, and proposed slices. M5 production work may not
-begin until M5-00 freezes those decisions; Milestone 3 and earlier plans remain
-historical ledgers.
+[Milestone 5 contract handoff](milestone-5-handoff.md) records the accepted
+M5-00 resolution and the [M5 task plan](milestone-5-plan.md). M5-01+ production
+work may begin only through the slice-specific workflow gates; Milestone 3 and
+earlier plans remain historical ledgers.
 
 ## Roles and ownership
 
