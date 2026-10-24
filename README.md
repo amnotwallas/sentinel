@@ -49,15 +49,20 @@ Sentinel is under active MVP development. The current `main` branch includes:
   controls, timeouts, bounded response capture, and no implicit proxy or retry;
 - conservative replay handling for ambiguous dispatches;
 - redacted execution and attempt observations exposed through `/api/v1`;
+- deterministic assertion and selected-baseline evaluation with explainable,
+  bounded evidence;
+- immutable baseline promotion, activation history, rollback, and typed baseline
+  APIs;
 - W3C Trace Context and Baggage propagation with OpenTelemetry client spans;
 - generated OpenAPI TypeScript types, a React application shell, Docker Compose,
   migrations, and CI quality gates.
 
-The remaining MVP work includes deterministic assertion and baseline evaluation,
-Tempo trace reconciliation, the complete authoring/results UI, retention, and
-release hardening. Milestone 3 is complete with status **PASS** at
-`a41670b5c9da5410d0bd50d4ceaca495d23998bf`; Milestone 4 contract planning is
-next. See the [roadmap](docs/ROADMAP.md) for the ordered delivery plan.
+The remaining MVP work includes Tempo trace reconciliation, the complete
+authoring/results UI, retention, and release hardening. Milestone 4 is complete
+with status **PASS** at `8e280be334b8fa71044005ad6557a3b91f0dd828`;
+Milestone 5 contract planning is next. See the [roadmap](docs/ROADMAP.md) and
+[M5 planning handoff](docs/development/milestone-5-handoff.md) for the ordered
+delivery plan.
 
 ## How it works
 
@@ -75,12 +80,12 @@ flowchart LR
     F --> G[Persist attempt and trace context]
     G --> H[Validate target and send request]
     H --> I[Redact and bound observation]
-    I --> J[Execution and attempt APIs]
-    I -. upcoming .-> K[Assertions and immutable baselines]
+    I --> K[Assertions and immutable baselines]
+    K --> J[Execution and attempt APIs]
     I -. upcoming .-> L[Tempo trace reconciliation]
 
     classDef planned stroke-dasharray: 5 5,fill:#f6f8fa,color:#57606a;
-    class K,L planned;
+    class L planned;
 ```
 
 PostgreSQL delivery is **at least once**, but a recovered job is not automatic

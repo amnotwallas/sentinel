@@ -1,16 +1,39 @@
 # Milestone 4 implementation contract
 
-Status: **M4-00 frozen and accepted**. This packet is based on documentation commit
-`b63c456148a626606dcc5568a3bae9d6a8fff3ff`. Independent contract review passed
-with no unresolved critical or important finding. The repository owner accepted
-the packet and ADRs 0009/0010 on 2026-10-23. It is normative for M4
-implementation, while M4-00 remains documentation-only and does not register
-routes, create migrations, or authorize production code.
+Status: **PASS**. M4-00 through M4-06 are complete at accepted implementation SHA
+`8e280be334b8fa71044005ad6557a3b91f0dd828`. This packet was frozen from
+documentation base `b63c456148a626606dcc5568a3bae9d6a8fff3ff`; independent
+contract review passed with no unresolved critical or important finding, and the
+repository owner accepted the packet and ADRs 0009/0010 on 2026-10-23. The frozen
+contract remains normative historical authority for the implemented milestone.
+
+## Implementation ledger
+
+| Slice | Integrated commit | Accepted outcome |
+| --- | --- | --- |
+| M4-00 — Contract freeze | `2870b0a0c27a9d235c3834d75d7e84824b419e93` | Contract, ADR rationale, schema relationships, wire semantics, and acceptance matrix frozen. |
+| M4-01 — Pure evaluator | `b9c99c646cac2b5611339ce5b1315a1f8bcf7ff7` | Deterministic evaluation engine and unit coverage integrated. |
+| M4-02 — Persistence foundation | `ccdb31253d0f6c21fa81b16883e5d7faf1696807` | Migration `0010`, repositories, constraints, candidate pinning, and PostgreSQL concurrency coverage integrated. |
+| M4-03 — Fenced evaluation | `b65fc2cbe95ec42742777603d1155f201377dfe8` | Fenced persistence, aggregation, crash recovery, and no-resend behavior integrated. |
+| M4-04 — Baseline services | `3a21b82f1cd7c43129f75da3f4939969a2ff3c31` | Explicit promotion, activation, rollback, history, and safe change evidence integrated. |
+| M4-05 — Result contracts | `c9c7fcb7d1df2b1ff201f1b9079ea936c2b60a8f` | Baseline/result APIs, OpenAPI, generated TypeScript, and typed client coverage integrated. |
+| M4-06 — Acceptance | `8e280be334b8fa71044005ad6557a3b91f0dd828` | Independent review defect corrected; exact-SHA owner-supplied CI accepted. |
+
+The M4-06 review found that a response with an `application/json` or `+json`
+media type was left as text when no JSON redaction pointer was configured. That
+prevented the evaluator from receiving the JSON representation required by JSON
+assertions and selectors. The accepted implementation detects JSON media types
+independently of configured redaction pointers and includes a focused regression
+test. The repository owner supplied matching GitHub Actions results for the
+accepted SHA: Backend and PostgreSQL `success`, Frontend and Contracts `success`,
+Docker Compose `success`, 500/500 backend tests passed, and 12/12 frontend tests
+passed. The run was not independently retrieved and no run URL or step logs were
+supplied.
 
 ## 1. Authority and scope
 
 This packet closes the eight questions in the
-[M4 planning handoff](../development/milestone-4-handoff.md). It must be read with
+[M4 acceptance handoff](../development/milestone-4-handoff.md). It must be read with
 the [MVP](../MVP.md), [roadmap](../ROADMAP.md),
 [ADR 0003](../architecture/ADRs/0003-deterministic-regression-detection.md),
 [ADR 0004](../architecture/ADRs/0004-immutable-baselines.md),
@@ -606,12 +629,35 @@ being blocked by baseline scalar provenance.
   compares a later run, activates an older compatible version, and explains each
   result without Tempo dependency.
 
-## 11. Contract status
+## 11. Contract and acceptance status
 
-No technical contract question from the planning handoff is intentionally left
-open in the accepted M4-00 contract. Independent review found no unresolved
-critical or important issue; the repository owner accepted ADRs 0009 and 0010 and
-the packet on 2026-10-23. The documentation-only M4-02 migration allocation is
-revision `0010_m4_evaluation_and_baselines` on parent `0009`; M4-00 creates no
-migration file. M4-01 production work begins only after this accepted commit is
-integrated.
+No technical contract question from the planning handoff remains open in the
+accepted M4 contract. Independent contract review found no unresolved critical or
+important issue; the repository owner accepted ADRs 0009 and 0010 and the packet
+on 2026-10-23. M4-02 implemented the allocated revision
+`0010_m4_evaluation_and_baselines` on parent `0009`. M4-01 through M4-05 then
+implemented the frozen contract, and M4-06 independently reviewed the integrated
+candidate. The JSON classification defect found in that review was corrected and
+covered before exact-SHA CI passed at `8e280be`.
+
+Accepted evidence preserves the named matrix in section 10:
+
+- deterministic evaluator and verdict coverage, including JSON null/absence,
+  normalizer failures, numeric precision, redaction overlap, and bounded evidence;
+- PostgreSQL migration, ownership, cardinality, candidate-pinning, activation,
+  concurrent promotion, rollback, and legacy-row behavior;
+- recovery from response/evaluation checkpoints, stale-fence rejection, replay
+  exclusion, atomic aggregation, and no target resend after durable observation;
+- explicit baseline bootstrap, compatibility, history, retention independence,
+  safe problems, API schemas, generated-client drift, and contextual change
+  evidence;
+- synthetic privacy-canary inspection across persistence, API, logs, spans, and
+  snapshots; and
+- the Compose execution/evaluation/promotion/comparison/rollback journey.
+
+M4 intentionally does not implement Tempo reconciliation (M5), the product UI
+(M6), or retention execution (M7). Evaluation metadata retains the accepted
+30-day policy and response artifacts the seven-day policy, but M7 still owns the
+idempotent chunked cleanup job, restart recovery, representative query-plan/index
+evidence, full cross-sink privacy scan, operational retention documentation, and
+proof that cleanup preserves immutable baseline values and provenance.

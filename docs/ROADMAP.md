@@ -58,10 +58,18 @@ not separately supplied or recorded. The detailed acceptance mapping is in the
 transition is in the
 [Milestone 3 handoff](development/milestone-3-handoff.md). Milestone 3 is complete
 with status **PASS** at accepted implementation SHA
-`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. M4-00 was accepted and frozen on
-2026-10-23 from published documentation base
-`b63c456148a626606dcc5568a3bae9d6a8fff3ff`; no M4 production slice is accepted
-yet.
+`a41670b5c9da5410d0bd50d4ceaca495d23998bf`. Milestone 4 is complete with
+status **PASS** at accepted implementation SHA
+`8e280be334b8fa71044005ad6557a3b91f0dd828`. M4-00 through M4-06 are complete.
+The repository owner supplied matching exact-SHA GitHub Actions evidence:
+Backend and PostgreSQL, Frontend and Contracts, and Docker Compose all concluded
+`success`, with 500/500 backend and 12/12 frontend tests passing. This evidence
+was accepted without independently retrieving GitHub Actions. The
+[Milestone 4 acceptance handoff](development/milestone-4-handoff.md) records the
+independent review, its corrected JSON response-classification defect, and the
+accepted evidence. Milestone 5 remains planning-only pending M5-00 contract
+freeze; its inputs and unresolved decisions are in the
+[Milestone 5 planning handoff](development/milestone-5-handoff.md).
 
 ### Goal
 
@@ -234,14 +242,16 @@ observations, before implementing baseline comparisons.
 
 ## Milestone 4: Deterministic evaluation and baseline management
 
-Status: **M4-00 frozen and accepted; M4-01 not started**. Accepted decisions and
-executable acceptance criteria are in the
-[implementation packet](implementation/milestone-4.md), and the dependency order
-is in the [task plan](development/milestone-4-plan.md). Production implementation
-starts with M4-01 after the accepted documentation commit is integrated. M4-02's
-next migration is allocated in documentation as revision
-`0010_m4_evaluation_and_baselines` on parent `0009`; no migration is created by
-M4-00.
+Status: **PASS**. M4-00 through M4-06 are complete at accepted implementation SHA
+`8e280be334b8fa71044005ad6557a3b91f0dd828`. The frozen decisions and executable
+acceptance criteria remain in the
+[implementation packet](implementation/milestone-4.md), the completed dependency
+ledger is in the [task plan](development/milestone-4-plan.md), and evidence is in
+the [acceptance handoff](development/milestone-4-handoff.md). The independent
+M4-06 review found that JSON responses without configured redaction pointers were
+classified as text; the accepted SHA classifies `application/json` and `+json`
+responses as JSON and includes a regression test. Exact-SHA owner-supplied CI
+passed all three jobs with 500/500 backend and 12/12 frontend tests.
 
 ### Goal
 
@@ -277,6 +287,11 @@ explainable evidence and immutable baseline history.
 - No baseline changes without explicit operator action.
 
 ## Milestone 5: Trace correlation and evidence
+
+Status: **planning only**. The
+[Milestone 5 planning handoff](development/milestone-5-handoff.md) separates
+accepted architecture from decisions that M5-00 must freeze. No M5 schema, job,
+Tempo client, API, or generated contract is approved by this roadmap status.
 
 ### Goal
 

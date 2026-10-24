@@ -1,6 +1,7 @@
 # Milestone 4 task plan
 
-Status: **M4-00 frozen and accepted; M4-01 not started**. The documentation base is
+Status: **PASS**. M4-00 through M4-06 are complete at accepted implementation SHA
+`8e280be334b8fa71044005ad6557a3b91f0dd828`. The original documentation base was
 `b63c456148a626606dcc5568a3bae9d6a8fff3ff`. The exact contracts are in the
 [M4 implementation packet](../implementation/milestone-4.md),
 [ADR 0009](../architecture/ADRs/0009-deterministic-evaluation-and-baseline-bootstrap.md),
@@ -29,7 +30,19 @@ The sequence is intentionally serial. Parallelizing shared verdict, persistence,
 or generated-contract work would increase merge and compatibility risk without a
 meaningful independent seam.
 
-## M4-00 — Accepted contract freeze
+## Completion ledger
+
+| Slice | Integrated commit | Result |
+| --- | --- | --- |
+| M4-00 — Contract freeze | `2870b0a0c27a9d235c3834d75d7e84824b419e93` | Accepted ADRs 0009/0010, contract packet, schema, wire semantics, and acceptance matrix frozen. |
+| M4-01 — Pure evaluator | `b9c99c646cac2b5611339ce5b1315a1f8bcf7ff7` | Deterministic assertions, selectors, normalizers, evidence, and verdict aggregation implemented. |
+| M4-02 — Persistence | `ccdb31253d0f6c21fa81b16883e5d7faf1696807` | Evaluation/baseline schema, candidate pinning, repositories, constraints, and concurrency coverage implemented. |
+| M4-03 — Orchestration | `b65fc2cbe95ec42742777603d1155f201377dfe8` | Fenced evaluation, aggregation, recovery, and no-resend behavior implemented. |
+| M4-04 — Baseline services | `3a21b82f1cd7c43129f75da3f4939969a2ff3c31` | Promotion, activation, rollback, history, concurrency, and safe change evidence implemented. |
+| M4-05 — Result contracts | `c9c7fcb7d1df2b1ff201f1b9079ea936c2b60a8f` | Baseline/result APIs, runtime OpenAPI, generated TypeScript, and typed client tests implemented. |
+| M4-06 — Acceptance | `8e280be334b8fa71044005ad6557a3b91f0dd828` | Independent acceptance found and corrected JSON response classification; matching exact-SHA CI passed. |
+
+## M4-00 — Accepted contract freeze — complete
 
 - **Objective:** Resolve all eight planning questions and produce one reviewable
   contract, ADR rationale, acceptance matrix, and implementation order.
@@ -38,15 +51,16 @@ meaningful independent seam.
 - **Acceptance:** Independent architecture, API, persistence, failure-recovery,
   and privacy review; no unresolved critical/important finding; valid links;
   documentation-only diff; `git diff --check`; no accepted ADR edited.
-- **Current status:** Accepted by the repository owner on 2026-10-23; ADRs 0009
-  and 0010 are accepted; no production slice is included.
+- **Accepted result:** Accepted by the repository owner on 2026-10-23 at
+  `2870b0a0c27a9d235c3834d75d7e84824b419e93`; ADRs 0009 and 0010 remain
+  accepted history. M4-00 itself included no production code.
 - **Migration allocation (documentation-only):** M4-02 owns Alembic revision
   `0010_m4_evaluation_and_baselines`, parent `0009_attempt_response_outcomes`
   (`0009`). M4-00 creates no migration file.
-- **Integration gate:** The accepted documentation commit must be integrated before
-  M4-01 begins. No production slice may change this contract silently.
+- **Integration gate:** The documentation commit was integrated before M4-01.
+  No later production slice changed this contract silently.
 
-## M4-01 — Pure deterministic evaluator
+## M4-01 — Pure deterministic evaluator — complete
 
 - **Objective:** Implement assertions, selectors, versioned normalizers, bounded
   evidence, baseline comparison, and verdict aggregation as pure domain code.
@@ -58,7 +72,7 @@ meaningful independent seam.
   no I/O or secret-bearing input.
 - **Gate:** Ruff, strict mypy, focused regression tests, then backend unit suite.
 
-## M4-02 — Persistence foundation and candidate pinning
+## M4-02 — Persistence foundation and candidate pinning — complete
 
 - **Objective:** Persist pinned candidates, attempt verdicts, comparison/result
   rows, inherited execution result-contract versions, immutable baselines, and
@@ -75,7 +89,7 @@ meaningful independent seam.
 - **Gate:** Focused unit/PostgreSQL concurrency tests, reviewed migration SQL,
   migration round trip, backend full gate.
 
-## M4-03 — Fenced evaluation and aggregation
+## M4-03 — Fenced evaluation and aggregation — complete
 
 - **Objective:** Connect durable M3 observations and pinned candidates to the
   pure evaluator, atomically persist results, and advance item/execution state.
@@ -91,7 +105,7 @@ meaningful independent seam.
 - **Gate:** Focused state/recovery tests with injected time, UUIDs, and failures;
   PostgreSQL two-worker tests; backend full gate.
 
-## M4-04 — Baseline services
+## M4-04 — Baseline services — complete
 
 - **Objective:** Implement promotion, immutable version creation, activation,
   rollback, history, warning confirmation, and scope concurrency behind explicit
@@ -106,7 +120,7 @@ meaningful independent seam.
 - **Gate:** Focused domain/PostgreSQL concurrency tests and backend full gate;
   runtime/generated contracts remain byte-for-byte unchanged.
 
-## M4-05 — Baseline/result API, change evidence, and typed handoff
+## M4-05 — Baseline/result API, change evidence, and typed handoff — complete
 
 - **Objective:** Publish list/promote/activate commands together with implemented
   evaluation/baseline reads, promotion assessment, complete pinned change
@@ -122,7 +136,7 @@ meaningful independent seam.
 - **Gate:** Backend contract/full tests, frontend lint/type/Vitest/build, runtime
   and generated drift checks.
 
-## M4-06 — Independent acceptance and milestone integration
+## M4-06 — Independent acceptance and milestone integration — complete
 
 - **Objective:** Verify the exact integrated candidate against the complete M4
   contract and roadmap, including failure recovery and privacy sinks.
@@ -137,6 +151,12 @@ meaningful independent seam.
 - **Evidence:** Exact candidate SHA or uncommitted fingerprint, command/count
   report, migration SQL, review findings/resolutions, Compose identity, and only
   after authorized publication exact-SHA remote CI evidence.
+- **Accepted result:** The independent review found one defect: responses with a
+  JSON media type and no configured JSON redaction pointers remained classified
+  as text, preventing JSON evaluation. Commit `8e280be` corrected media-type
+  classification for `application/json` and `+json` and added a focused
+  regression test. Owner-supplied exact-SHA CI then reported all three jobs
+  successful, with 500/500 backend and 12/12 frontend tests passing.
 
 ## Release rules
 

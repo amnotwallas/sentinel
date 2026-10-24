@@ -1,17 +1,19 @@
-# Milestone 4 planning handoff
+# Milestone 4 acceptance handoff
 
-Status: **M4-00 frozen and accepted; M4-01 not started**.
-Milestones 1, 2, and 3 are accepted; the accepted M3 implementation remains
+Status: **PASS**. M4-00 through M4-06 are complete on `main` at accepted
+implementation SHA `8e280be334b8fa71044005ad6557a3b91f0dd828`.
+Milestones 1, 2, and 3 remain accepted; their historical acceptance records are
+unchanged. The accepted M3 implementation remains
 `a41670b5c9da5410d0bd50d4ceaca495d23998bf`, and the published documentation
-base for M4-00 is `b63c456148a626606dcc5568a3bae9d6a8fff3ff`.
-This handoff preserves the inputs and questions supplied to M4-00. Their accepted
-resolutions are in the [M4 implementation packet](../implementation/milestone-4.md),
+base for M4-00 remains `b63c456148a626606dcc5568a3bae9d6a8fff3ff`.
+This handoff preserves the inputs and questions supplied to M4-00 together with
+the completed implementation and acceptance evidence. Their accepted resolutions
+remain in the [M4 implementation packet](../implementation/milestone-4.md),
 [task plan](milestone-4-plan.md),
 [ADR 0009](../architecture/ADRs/0009-deterministic-evaluation-and-baseline-bootstrap.md),
 [ADR 0010](../architecture/ADRs/0010-baseline-api-persistence-and-provenance.md).
-Those documents freeze the M4-00 contract and allocate the next migration in
-documentation only; they do not change runtime compatibility surfaces or
-authorize production changes.
+Those documents froze M4-00 before the completed production slices changed
+runtime compatibility surfaces.
 
 ## Normative inputs
 
@@ -38,24 +40,58 @@ authorize production changes.
 - Use the [development workflow](workflow.md) for ownership/isolation and the
   [quality gates](quality-gates.md) for candidate evidence.
 
-## Current implementation boundary
+## Accepted implementation outcome
 
-M2 already validates and stores immutable assertion/comparison documents and a
-canonical SHA-256 policy fingerprint. The accepted v1 rule documents include
-required/advisory assertions, JSON or complete-text selectors, the `none`,
-`sort_scalar_array`, and `round_decimal` normalizers, and an optional integer
-duration threshold.
+M2 continues to provide immutable assertion/comparison documents and canonical
+SHA-256 policy fingerprints. M3 continues to provide bounded redacted
+observations, exact revision pins, attempt/replay identity, and conservative
+recovery. M4 adds the pure evaluator, persisted ordered evaluation and comparison
+records, attempt/item/execution verdict aggregation, immutable baseline versions,
+append-only activation history, explicit promotion/rollback services, bounded
+change evidence, baseline/result APIs, runtime OpenAPI, and generated TypeScript.
 
-M3 persists redacted bounded observations and pins the exact test-case revision
-for every execution item. `TestAttempt` already has an `evaluated` state and an
-`included_in_verdict` flag; replay predecessors are excluded when a successor is
-created. Execution and item rows already carry the accepted verdict vocabulary,
-but attempt verdicts are not persisted and attempt API reads return `null`.
-Today a durable attempt remains in `response_received`; its item and eventual
-execution complete with `not_evaluated`, and the job succeeds because the
-evaluator, evaluation records, baseline rows, and baseline APIs do not exist.
-Runtime OpenAPI exposes only implemented M3 fields; it must not grow until an M4
-slice implements and tests the corresponding behavior.
+Evaluation consumes only the durable redacted observation and pinned immutable
+inputs. The actual baseline candidate is pinned to the execution item. Fenced
+result persistence and aggregation resume after a durable response without
+resending or refetching the target request, and replay predecessors remain
+excluded. Baseline changes require explicit operator commands and preserve
+immutable version and activation history.
+
+M4-06 found one integration defect: JSON responses without configured JSON
+redaction pointers were classified as text, so JSON rules could not consume the
+response as JSON. The accepted SHA recognizes `application/json` and `+json`
+media types independently of redaction configuration and includes the focused
+regression test
+`test_json_content_type_is_parsed_without_configured_redaction`.
+
+## M4-06 acceptance evidence
+
+- **Accepted identity:** `8e280be334b8fa71044005ad6557a3b91f0dd828`
+  on `main`; local `HEAD`, `main`, and `origin/main` were verified at that SHA
+  before this documentation update.
+- **Independent review:** M4-06 exercised the accepted matrix across deterministic
+  evaluation, persistence, recovery/fencing, baseline concurrency and rollback,
+  API/generated contracts, privacy/retention, and the end-to-end Compose journey.
+  The JSON classification defect above was corrected and regression-tested before
+  acceptance.
+- **Recovery evidence:** response-checkpoint recovery does not redispatch;
+  evaluation persistence is atomic; stale fences cannot commit; replay
+  predecessors do not contribute; delivery exhaustion after a durable response
+  produces one final inconclusive transaction without resending.
+- **Concurrency and baseline evidence:** execution materialization pins the
+  current activation; concurrent activation/promotion serializes per scope;
+  versions and current activation remain unique; failed commands roll back;
+  compatible rollback and immutable history remain available after artifact
+  expiry.
+- **Privacy evidence:** selected/evaluation evidence stays bounded and redacted;
+  sensitive or redaction-overlapping values are not compared or promoted;
+  change-event summaries and problems contain no selected values or operator
+  reasons; synthetic canaries cover database, API, log, span, and snapshot sinks.
+- **Owner-supplied exact-SHA CI:** Backend and PostgreSQL `success`, Frontend and
+  Contracts `success`, Docker Compose `success`, 500/500 backend tests passed,
+  and 12/12 frontend tests passed. This report was accepted without independently
+  retrieving GitHub Actions; no run URL, run ID, duration, or step logs were
+  supplied.
 
 ## Accepted M4 requirements
 
@@ -278,15 +314,16 @@ implementation. Do not edit accepted ADR history.
 The sequence is deliberately mostly serial because the evaluator, persistence,
 worker transition, and public contract share compatibility decisions.
 
-### M4-00 — Contract freeze and acceptance matrix
+### M4-00 — Contract freeze and acceptance matrix — complete
 
 - Resolve every open decision above; freeze domain vocabulary, transactions,
   wire shapes, evidence bounds, schema relationships, and named acceptance cases.
 - Produce the reviewed implementation packet and planned schema/fixtures without
   registering routes or allocating production migrations prematurely.
 - **Dependency:** accepted M3 SHA `a41670b`.
+- **Integrated:** `2870b0a0c27a9d235c3834d75d7e84824b419e93`.
 
-### M4-01 — Pure deterministic evaluator
+### M4-01 — Pure deterministic evaluator — complete
 
 - Implement assertion evaluation, JSON Pointer handling, versioned normalizers,
   selected-value comparison, bounded evidence, and pure verdict aggregation under
@@ -295,8 +332,9 @@ worker transition, and public contract share compatibility decisions.
   dependency unless M4-00 demonstrates the standard library and installed stack
   are insufficient.
 - **Dependency:** M4-00 frozen semantics. No database or API work.
+- **Integrated:** `b9c99c646cac2b5611339ce5b1315a1f8bcf7ff7`.
 
-### M4-02 — Evaluation and baseline persistence foundation
+### M4-02 — Evaluation and baseline persistence foundation — complete
 
 - Add the allocated Alembic revision `0010` on parent `0009`, domain ports,
   PostgreSQL repositories, constraints, indexes, and transaction tests for
@@ -307,8 +345,9 @@ worker transition, and public contract share compatibility decisions.
   M1-M3 data preservation, and actual-candidate association.
 - **Dependency:** M4-00 schema and transaction contract; consumes M4-01 value
   types without importing framework/ORM concerns into the domain.
+- **Integrated:** `ccdb31253d0f6c21fa81b16883e5d7faf1696807`.
 
-### M4-03 — Fenced execution evaluation and aggregation
+### M4-03 — Fenced execution evaluation and aggregation — complete
 
 - Connect durable response observations and the pinned baseline candidate to the
   evaluator, persist the attempt verdict/comparison/evaluations atomically under
@@ -317,8 +356,9 @@ worker transition, and public contract share compatibility decisions.
 - Recovery after every new checkpoint must resume without target resend or result
   duplication; replay predecessors remain excluded.
 - **Dependency:** integrated M4-01 and M4-02.
+- **Integrated:** `b65fc2cbe95ec42742777603d1155f201377dfe8`.
 
-### M4-04 — Baseline application services
+### M4-04 — Baseline application services — complete
 
 - Implement explicit create/promote, list/history, and activate/rollback flows,
   including eligibility, fingerprint compatibility, optimistic concurrency,
@@ -326,8 +366,9 @@ worker transition, and public contract share compatibility decisions.
 - Keep transport routes, runtime OpenAPI, and generated clients unchanged; this
   slice owns no M6 authoring UI and does not auto-promote.
 - **Dependency:** evaluated-attempt and persistence contracts from M4-03.
+- **Integrated:** `3a21b82f1cd7c43129f75da3f4939969a2ff3c31`.
 
-### M4-05 — Baseline/result contract and typed-client handoff
+### M4-05 — Baseline/result contract and typed-client handoff — complete
 
 - Publish baseline command/history routes together with implemented evaluation/
   baseline fields, update execution and attempt reads with persisted verdict/
@@ -338,8 +379,9 @@ worker transition, and public contract share compatibility decisions.
   planned artifacts unless M4-00 explicitly supersedes them with a new planned
   contract.
 - **Dependency:** integrated M4-03 and M4-04. No product UI.
+- **Integrated:** `c9c7fcb7d1df2b1ff201f1b9079ea936c2b60a8f`.
 
-### M4-06 — Independent acceptance and milestone integration
+### M4-06 — Independent acceptance and milestone integration — complete
 
 - Independently verify the accepted M4 matrix, privacy sinks, concurrency,
   migration round trips, contract drift, PostgreSQL suite, and full Compose
@@ -348,20 +390,23 @@ worker transition, and public contract share compatibility decisions.
   and—after separately authorized publication—remote CI for that exact SHA.
 - **Dependency:** M4-01 through M4-05 integrated; no unresolved security or
   compatibility finding.
+- **Integrated and accepted:** `8e280be334b8fa71044005ad6557a3b91f0dd828`.
 
-## Ownership and readiness
+## Accepted boundaries and next handoff
 
-The coordinator owns M4-00, shared model registration, migration allocation and
-chain, API/worker composition, shared fixtures, generated contracts, milestone
-documentation, integration, and final evidence. One backend writer should own
-each sequential domain/persistence/application slice; frontend work begins only
-after the coordinator publishes the implemented generated contract. Independent
-QA/security review is read-only unless assigned exclusive acceptance files.
+The coordinator retained ownership of shared registration, migration ordering,
+API/worker composition, fixtures, generated contracts, milestone documentation,
+integration, and final evidence. M4-02 implemented Alembic revision
+`0010_m4_evaluation_and_baselines` on parent
+`0009_attempt_response_outcomes`; one migration head was preserved.
 
-The M4-00 candidate prepared from documentation base `b63c456` passed independent
-contract review with no unresolved critical or important finding. The repository
-owner accepted ADRs 0009 and 0010 and the implementation packet on 2026-10-23.
-M4-02 is allocated Alembic revision `0010_m4_evaluation_and_baselines`, parent
-`0009_attempt_response_outcomes` (`0009`); this is documentation-only and creates
-no migration file. Per-slice databases, ports, and production authorization are
-allocated when each implementation slice begins.
+Accepted limitations remain explicit: M4 does not query Tempo or make telemetry
+part of a verdict, does not add the M6 product UI, and does not implement the M7
+retention worker. Baseline selected values persist until project deletion;
+evaluation metadata and response artifacts retain the accepted 30-day and
+seven-day policies, but M7 owns cleanup execution, restartability, operational
+documentation, query-plan/index evidence, and the release-wide privacy scan.
+
+Proceed only to the [Milestone 5 planning handoff](milestone-5-handoff.md).
+M5-00 must freeze unresolved trace persistence, queue, Tempo, evidence, retry,
+privacy, and API decisions before any M5 production implementation begins.

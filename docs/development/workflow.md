@@ -4,10 +4,12 @@ This is a developer collaboration guide, not a change to the product architectur
 [AGENTS.md](../../AGENTS.md), the [MVP](../MVP.md), [architecture](../architecture/README.md),
 accepted ADRs, and [roadmap](../ROADMAP.md) remain authoritative. The
 [audit](workflow-audit.md) records evidence and unapplied recommendations;
-the [Milestone 4 planning handoff](milestone-4-handoff.md) records the accepted
-M4-00 inputs and resolutions, while the [M4 task plan](milestone-4-plan.md)
-records the frozen slice boundaries and sequence. Milestone 3 and earlier plans
-remain historical ledgers.
+the [Milestone 4 acceptance handoff](milestone-4-handoff.md) and
+[completed M4 task plan](milestone-4-plan.md) are historical ledgers. The
+[Milestone 5 planning handoff](milestone-5-handoff.md) records accepted M5 inputs,
+unresolved contract decisions, and proposed slices. M5 production work may not
+begin until M5-00 freezes those decisions; Milestone 3 and earlier plans remain
+historical ledgers.
 
 ## Roles and ownership
 
