@@ -6,6 +6,8 @@ from typing import Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from sentinel.telemetry.tempo import validate_tempo_url
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SENTINEL_", extra="ignore")
@@ -36,6 +38,7 @@ class Settings(BaseSettings):
             raise ValueError("non-loopback API binding requires api_token")
         if self.heartbeat_seconds >= self.lease_seconds / 2:
             raise ValueError("heartbeat must be less than half the lease duration")
+        validate_tempo_url(self.tempo_url)
         if self.target_ca_bundle is not None:
             path = Path(self.target_ca_bundle)
             if not path.is_absolute():
