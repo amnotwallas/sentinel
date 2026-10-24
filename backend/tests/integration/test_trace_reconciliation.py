@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -16,6 +16,8 @@ from sentinel.persistence.models import ExecutionRow, JobRow, TestAttemptRow, Tr
 from sentinel.persistence.queue import PostgresJobStore
 from sentinel.telemetry.ports import (
     ContextContinuity,
+    LinkedTrace,
+    ServiceEvidence,
     TraceErrorCode,
     TraceLookup,
     TraceLookupStatus,
@@ -36,6 +38,7 @@ class ScriptedLookup:
     def __init__(self, results: Sequence[TraceLookup]) -> None:
         self.results = list(results)
         self.calls = 0
+        self.search_calls = 0
 
     def lookup(
         self,
@@ -49,12 +52,20 @@ class ScriptedLookup:
         assert result.trace_id == trace_id
         return result
 
+    def search_supported(self) -> bool:
+        return False
+
+    def search_attempt(self, *_args: object, **_kwargs: object) -> tuple[LinkedTrace, ...]:
+        self.search_calls += 1
+        return ()
+
 
 def result(
     status: TraceLookupStatus,
     *,
     error: TraceErrorCode | None = None,
     span: str | None = None,
+    services: tuple[ServiceEvidence, ...] = (),
 ) -> TraceLookup:
     return TraceLookup(
         trace_id="b" * 32,
@@ -65,7 +76,7 @@ def result(
             2 if status in {TraceLookupStatus.AVAILABLE, TraceLookupStatus.PARTIAL} else 0
         ),
         error_span_count=1 if status is TraceLookupStatus.AVAILABLE else 0,
-        services=(),
+        services=services,
         context_continuity=(
             ContextContinuity.CONNECTED
             if status is TraceLookupStatus.AVAILABLE
@@ -108,12 +119,20 @@ async def run_service(
     lease: Lease,
     lookup: ScriptedLookup,
     clock: Clock,
+    *,
+    linked_search_enabled: bool = False,
 ) -> None:
     async def delay(seconds: float) -> None:
         clock.advance(max(1, int(seconds)))
         queue.heartbeat(lease, 60)
 
-    service = TraceReconciliationService(queue, lookup, clock=clock, delay=delay)
+    service = TraceReconciliationService(
+        queue,
+        lookup,
+        clock=clock,
+        delay=delay,
+        linked_search_enabled=linked_search_enabled,
+    )
     await service.reconcile(lease, WorkerCancellation())
 
 
@@ -151,6 +170,165 @@ async def test_available_reconciliation_is_atomic_and_verdict_independent(
     assert execution is not None and execution.status == "queued"
     assert attempt is not None and attempt.state == "transport_failed"
     assert lookup.calls == 1
+
+
+async def test_unsupported_linked_search_leaves_direct_correlation_unchanged(
+    engine: Engine, seeded_attempt_catalog: None, clock: Clock
+) -> None:
+    queue, lease, _ = correlation_job(engine, clock)
+    lookup = ScriptedLookup([result(TraceLookupStatus.AVAILABLE, span="c" * 16)])
+
+    await run_service(queue, lease, lookup, clock, linked_search_enabled=True)
+
+    assert lookup.calls == 1
+    assert lookup.search_calls == 0
+
+
+async def test_linked_search_results_are_deduplicated_bounded_and_indirect(
+    engine: Engine, seeded_attempt_catalog: None, clock: Clock
+) -> None:
+    queue, lease, execution_lease = correlation_job(engine, clock)
+    identifiers = [f"{index + 1:032x}" for index in range(17)]
+    matches = tuple(
+        LinkedTrace(
+            trace_id=trace_id,
+            services=(ServiceEvidence(name=f"service-{index}"),),
+        )
+        for index, trace_id in enumerate(reversed(identifiers))
+    )
+    matches = matches + (matches[0], LinkedTrace(trace_id="b" * 32))
+
+    queue.record_trace_lookup(
+        lease,
+        result(TraceLookupStatus.AVAILABLE, span="c" * 16),
+        matches,
+    )
+
+    with Session(engine) as session:
+        primary = session.get(TraceReferenceRow, lease.trace_reference_id)
+        assert primary is not None
+        linked = list(
+            session.scalars(
+                select(TraceReferenceRow)
+                .where(
+                    TraceReferenceRow.attempt_id == primary.attempt_id,
+                    TraceReferenceRow.relation == "linked",
+                )
+                .order_by(TraceReferenceRow.trace_id)
+            )
+        )
+        execution = session.get(ExecutionRow, execution_lease.subject_id)
+
+    assert [row.trace_id for row in linked] == identifiers[:16]
+    assert len(linked) == 16
+    assert all(row.status == "available" for row in linked)
+    assert all(row.correlation_source == "baggage_attribute_search" for row in linked)
+    assert primary is not None and primary.evidence_json is not None
+    assert primary.evidence_json["linked_match_count"] == 16
+    assert execution is not None and execution.status == "queued"
+
+
+async def test_available_evidence_anchors_to_same_pinned_prior_primary(
+    engine: Engine, seeded_attempt_catalog: None, clock: Clock
+) -> None:
+    queue, lease, execution_lease = correlation_job(engine, clock)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    attempts = PostgresAttemptStore(factory, clock=clock)
+    with Session(engine) as session:
+        current_reference = session.get(TraceReferenceRow, lease.trace_reference_id)
+        assert current_reference is not None
+        item_id = current_reference.execution_item_id
+
+    previous_attempt = attempts.create_prepared(
+        item_id, attempt_id=uuid4(), now=NOW - timedelta(seconds=20)
+    )
+    attempts.checkpoint_dispatch(
+        previous_attempt.id,
+        execution_lease,
+        fingerprint="d" * 64,
+        trace_id="d" * 32,
+        span_id="e" * 16,
+    )
+    attempts.record_transport_failure(
+        previous_attempt.id,
+        execution_lease,
+        outcome=TransportOutcome.TOTAL_TIMEOUT,
+        certainty=DispatchCertainty.POSSIBLY_SENT,
+    )
+    with Session(engine) as session:
+        previous_reference = session.scalar(
+            select(TraceReferenceRow).where(TraceReferenceRow.attempt_id == previous_attempt.id)
+        )
+        assert previous_reference is not None
+        previous_reference.status = "available"
+        previous_reference.updated_at = NOW - timedelta(seconds=1)
+        previous_reference.evidence_json = {
+            "schema_version": 1,
+            "primary_span_found": True,
+            "trace_span_count": 1,
+            "error_span_count": 0,
+            "services": [{"name": "api", "version": "1", "environment": "prod", "revision": "r1"}],
+            "deployments": [{"service": "api", "environment": "prod", "revision": "r1"}],
+            "linked_match_count": 0,
+            "context_continuity": "connected",
+            "comparison_anchor": None,
+        }
+        previous_reference_id = previous_reference.id
+        session.commit()
+
+    replay_attempt = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    replay_successor = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    attempts.checkpoint_dispatch(
+        replay_attempt.id,
+        execution_lease,
+        fingerprint="f" * 64,
+        trace_id="e" * 32,
+        span_id="f" * 16,
+    )
+    attempts.record_transport_failure(
+        replay_attempt.id,
+        execution_lease,
+        outcome=TransportOutcome.TOTAL_TIMEOUT,
+        certainty=DispatchCertainty.POSSIBLY_SENT,
+    )
+    with Session(engine) as session:
+        replay_row = session.get(TestAttemptRow, replay_attempt.id)
+        replay_reference = session.scalar(
+            select(TraceReferenceRow).where(TraceReferenceRow.attempt_id == replay_attempt.id)
+        )
+        assert replay_row is not None and replay_reference is not None
+        replay_row.replay_successor_id = replay_successor.id
+        replay_reference.status = "available"
+        replay_reference.updated_at = NOW
+        replay_reference.evidence_json = {
+            "schema_version": 1,
+            "primary_span_found": True,
+            "trace_span_count": 1,
+            "error_span_count": 0,
+            "services": [{"name": "api", "version": "9", "environment": "prod", "revision": "r1"}],
+            "deployments": [{"service": "api", "environment": "prod", "revision": "r1"}],
+            "linked_match_count": 0,
+            "context_continuity": "connected",
+            "comparison_anchor": None,
+        }
+        session.commit()
+
+    queue.record_trace_lookup(
+        lease,
+        result(
+            TraceLookupStatus.AVAILABLE,
+            span="c" * 16,
+            services=(ServiceEvidence("api", version="2", environment="prod", revision="r1"),),
+        ),
+    )
+
+    with Session(engine) as session:
+        current_reference = session.get(TraceReferenceRow, lease.trace_reference_id)
+    assert current_reference is not None and current_reference.evidence_json is not None
+    assert current_reference.evidence_json["comparison_anchor"] == {
+        "reference_id": str(previous_reference_id),
+        "changed": [{"name": "api", "fields": ["version"]}],
+    }
 
 
 async def test_delayed_arrival_uses_frozen_schedule_and_separate_counters(

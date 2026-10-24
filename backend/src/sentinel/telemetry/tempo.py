@@ -10,11 +10,13 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import unquote, urlsplit
+from uuid import UUID
 
 import httpx
 
 from sentinel.telemetry.ports import (
     ContextContinuity,
+    LinkedTrace,
     ServiceEvidence,
     TraceErrorCode,
     TraceLookup,
@@ -27,6 +29,7 @@ SPAN_ID_PATTERN = re.compile(r"^[0-9a-f]{16}$")
 MAX_RESPONSE_BYTES = 1024 * 1024
 MAX_SPANS = 256
 MAX_SERVICES = 32
+MAX_LINKED_TRACES = 16
 MAX_TEXT_BYTES = 128
 CONNECT_TIMEOUT_SECONDS = 1.0
 READ_TIMEOUT_SECONDS = 2.0
@@ -473,3 +476,80 @@ class TempoLookupAdapter(TraceLookupPort):
                 supported = False
             self._search_supported = supported
             return supported
+
+    def search_attempt(
+        self,
+        attempt_id: UUID,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        limit: int,
+    ) -> tuple[LinkedTrace, ...]:
+        """Return only bounded results of the exact attempt-baggage search."""
+        limit = min(max(limit, 0), MAX_LINKED_TRACES)
+        if limit == 0:
+            return ()
+        try:
+            self._remaining(end_at)
+            with self._client.stream(
+                "GET",
+                "api/search",
+                params={
+                    "tags": f"sentinel.attempt.id={attempt_id}",
+                    "start": str(int(start_at.timestamp())),
+                    "end": str(int(end_at.timestamp())),
+                    "limit": str(limit),
+                },
+            ) as response:
+                if response.status_code != 200:
+                    return ()
+                body = self._read_body(response, end_at)
+        except Exception:
+            return ()
+        try:
+            document = json.loads(body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return ()
+        if not isinstance(document, dict) or not isinstance(document.get("traces"), list):
+            return ()
+
+        matches: dict[str, set[ServiceEvidence]] = {}
+        for trace in document["traces"]:
+            if not isinstance(trace, dict):
+                continue
+            raw_trace_id = trace.get("traceID")
+            if not isinstance(raw_trace_id, str):
+                continue
+            trace_id = raw_trace_id.lower()
+            if not _valid_trace_id(trace_id):
+                continue
+            services = matches.setdefault(trace_id, set())
+            span_sets = trace.get("spanSets", trace.get("spanSet", []))
+            if isinstance(span_sets, dict):
+                span_sets = [span_sets]
+            if not isinstance(span_sets, list):
+                continue
+            for span_set in span_sets:
+                if not isinstance(span_set, dict) or not isinstance(span_set.get("spans"), list):
+                    continue
+                for span in span_set["spans"]:
+                    if not isinstance(span, dict):
+                        continue
+                    values: dict[str, str] = {}
+                    for key, value in _string_attributes(span.get("attributes")):
+                        field = _SERVICE_ATTRIBUTES.get(key)
+                        if field is not None and field not in values:
+                            values[field] = value
+                    if "name" in values:
+                        services.add(
+                            ServiceEvidence(
+                                name=values["name"],
+                                version=values.get("version"),
+                                environment=values.get("environment"),
+                                revision=values.get("revision"),
+                            )
+                        )
+        return tuple(
+            LinkedTrace(trace_id=trace_id, services=_ordered_services(matches[trace_id]))
+            for trace_id in sorted(matches)[:limit]
+        )

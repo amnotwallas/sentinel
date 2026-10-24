@@ -55,6 +55,14 @@ class TraceLookup:
     response_size_bytes: int
 
 
+@dataclass(frozen=True, slots=True)
+class LinkedTrace:
+    """Safe result of an exact baggage-attribute search."""
+
+    trace_id: str
+    services: tuple[ServiceEvidence, ...] = ()
+
+
 class TraceLookupPort(Protocol):
     def lookup(
         self,
@@ -63,6 +71,17 @@ class TraceLookupPort(Protocol):
         expected_span_id: str,
         deadline: datetime,
     ) -> TraceLookup: ...
+
+    def search_supported(self) -> bool: ...
+
+    def search_attempt(
+        self,
+        attempt_id: UUID,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        limit: int,
+    ) -> tuple[LinkedTrace, ...]: ...
 
 
 class LinkedTraceSearchPort(Protocol):
@@ -73,7 +92,7 @@ class LinkedTraceSearchPort(Protocol):
         start_at: datetime,
         end_at: datetime,
         limit: int,
-    ) -> tuple[object, ...]: ...
+    ) -> tuple[LinkedTrace, ...]: ...
 
 
 Clock = Callable[[], datetime]

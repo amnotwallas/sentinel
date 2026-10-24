@@ -51,7 +51,11 @@ async def run(settings: Settings) -> None:
         handlers={
             "probe": probe_handler,
             "execute_execution": execution_handler(orchestrator),
-            "correlate_trace": reconciliation_handler(TraceReconciliationService(jobs, tempo)),
+            "correlate_trace": reconciliation_handler(
+                TraceReconciliationService(
+                    jobs, tempo, linked_search_enabled=settings.linked_trace_search_enabled
+                )
+            ),
         },
         health=healthy,
         tracer=worker_tracer,

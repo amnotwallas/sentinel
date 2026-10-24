@@ -17,6 +17,8 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TraceReferenceRow,
 )
+from sentinel.telemetry.evidence import MAX_LINKED_MATCHES, build_linked_evidence
+from sentinel.telemetry.ports import LinkedTrace
 from sentinel.telemetry.references import CorrelationSource, TraceReferenceStatus, TraceRelation
 
 TRACE_WINDOW = timedelta(seconds=60)
@@ -119,6 +121,9 @@ class TraceReferenceRepository:
         deadline_at: datetime,
         now: datetime,
         evidence: dict[str, object] | None = None,
+        status: TraceReferenceStatus = TraceReferenceStatus.PENDING,
+        checked_at: datetime | None = None,
+        lookup_attempt_count: int = 0,
     ) -> TraceReferenceRow:
         trace_id = _identity(trace_id, _TRACE_ID)
         if span_id is not None:
@@ -145,9 +150,11 @@ class TraceReferenceRepository:
             trace_id=trace_id,
             span_id=span_id,
             correlation_source=CorrelationSource.BAGGAGE_ATTRIBUTE_SEARCH,
-            status=TraceReferenceStatus.PENDING,
+            status=status,
+            first_checked_at=checked_at,
+            last_checked_at=checked_at,
             deadline_at=deadline_at,
-            lookup_attempt_count=0,
+            lookup_attempt_count=lookup_attempt_count,
             evidence_schema_version=1,
             evidence_json=evidence,
             created_at=now,
@@ -156,6 +163,121 @@ class TraceReferenceRepository:
         session.add(row)
         session.flush()
         return row
+
+    @staticmethod
+    def persist_linked_search(
+        session: Session,
+        *,
+        reference: TraceReferenceRow,
+        matches: tuple[LinkedTrace, ...],
+        now: datetime,
+    ) -> int:
+        """Persist at most sixteen exact-search results, idempotently."""
+        attempt = session.scalar(
+            select(TestAttemptRow)
+            .where(TestAttemptRow.id == reference.attempt_id)
+            .with_for_update()
+        )
+        item = session.scalar(
+            select(ExecutionItemRow)
+            .where(
+                ExecutionItemRow.id == reference.execution_item_id,
+                ExecutionItemRow.execution_id == reference.execution_id,
+                ExecutionItemRow.project_id == reference.project_id,
+            )
+            .with_for_update()
+        )
+        execution = session.scalar(
+            select(ExecutionRow)
+            .where(
+                ExecutionRow.id == reference.execution_id,
+                ExecutionRow.project_id == reference.project_id,
+            )
+            .with_for_update()
+        )
+        if attempt is None or item is None or execution is None:
+            raise ValueError("trace reference scope is incomplete")
+
+        existing = list(
+            session.scalars(
+                select(TraceReferenceRow)
+                .where(
+                    TraceReferenceRow.attempt_id == reference.attempt_id,
+                    TraceReferenceRow.relation == TraceRelation.LINKED,
+                )
+                .with_for_update()
+            )
+        )
+        by_trace = {row.trace_id: row for row in existing}
+        candidates = {
+            match.trace_id.lower(): match
+            for match in matches
+            if _TRACE_ID.fullmatch(match.trace_id.lower()) is not None
+            and set(match.trace_id.lower()) != {"0"}
+        }
+        for trace_id in sorted(candidates):
+            if trace_id == reference.trace_id or trace_id in by_trace:
+                row = by_trace.get(trace_id)
+                if row is not None and row.status == TraceReferenceStatus.PENDING:
+                    row.status = TraceReferenceStatus.AVAILABLE
+                    row.first_checked_at = row.first_checked_at or now
+                    row.last_checked_at = now
+                    row.lookup_attempt_count = max(row.lookup_attempt_count, 1)
+                continue
+            if len(by_trace) >= MAX_LINKED_MATCHES:
+                break
+            match = candidates[trace_id]
+            row = TraceReferenceRepository.create_linked(
+                session,
+                attempt=attempt,
+                item=item,
+                execution=execution,
+                trace_id=trace_id,
+                span_id=None,
+                deadline_at=reference.deadline_at,
+                now=now,
+                evidence=build_linked_evidence(match.services),
+                status=TraceReferenceStatus.AVAILABLE,
+                checked_at=now,
+                lookup_attempt_count=1,
+            )
+            by_trace[trace_id] = row
+        return len(by_trace)
+
+    @staticmethod
+    def latest_compatible_primary(
+        session: Session, *, reference: TraceReferenceRow
+    ) -> TraceReferenceRow | None:
+        """Find the latest included primary from the same pinned execution scope."""
+        item = session.get(ExecutionItemRow, reference.execution_item_id)
+        execution = session.get(ExecutionRow, reference.execution_id)
+        if item is None or execution is None:
+            return None
+        return session.scalar(
+            select(TraceReferenceRow)
+            .join(TestAttemptRow, TestAttemptRow.id == TraceReferenceRow.attempt_id)
+            .join(ExecutionItemRow, ExecutionItemRow.id == TraceReferenceRow.execution_item_id)
+            .join(ExecutionRow, ExecutionRow.id == TraceReferenceRow.execution_id)
+            .where(
+                TraceReferenceRow.id != reference.id,
+                TraceReferenceRow.project_id == reference.project_id,
+                TraceReferenceRow.relation == TraceRelation.PRIMARY,
+                TraceReferenceRow.status == TraceReferenceStatus.AVAILABLE,
+                TestAttemptRow.included_in_verdict.is_(True),
+                TestAttemptRow.replay_successor_id.is_(None),
+                ExecutionItemRow.test_case_id == item.test_case_id,
+                ExecutionItemRow.test_case_revision_id == item.test_case_revision_id,
+                ExecutionItemRow.test_case_revision_version == item.test_case_revision_version,
+                ExecutionRow.project_id == execution.project_id,
+                ExecutionRow.environment_id == execution.environment_id,
+                ExecutionRow.environment_revision_id == execution.environment_revision_id,
+                ExecutionRow.source_type == execution.source_type,
+                ExecutionRow.source_id == execution.source_id,
+                ExecutionRow.source_revision_id == execution.source_revision_id,
+            )
+            .order_by(TraceReferenceRow.updated_at.desc(), TraceReferenceRow.id.desc())
+            .limit(1)
+        )
 
     @staticmethod
     def finalize_primary(

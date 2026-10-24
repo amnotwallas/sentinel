@@ -9,7 +9,8 @@ from datetime import UTC, datetime, timedelta
 from sentinel.execution.domain import Lease
 from sentinel.execution.ports import CancellationSignal
 from sentinel.persistence.queue import PostgresJobStore
-from sentinel.telemetry.ports import TraceLookupPort
+from sentinel.telemetry.evidence import MAX_LINKED_MATCHES
+from sentinel.telemetry.ports import LinkedTrace, TraceLookupPort
 
 LOOKUP_OFFSETS = (0, 1, 3, 7, 15, 31, 59)
 _SCHEDULER_TICK_SECONDS = 1.0
@@ -48,11 +49,13 @@ class TraceReconciliationService:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         delay: Delay = asyncio.sleep,
+        linked_search_enabled: bool = False,
     ) -> None:
         self.store = store
         self.lookup = lookup
         self.clock = clock
         self.delay = delay
+        self.linked_search_enabled = linked_search_enabled
 
     async def _wait_until(self, due: datetime, cancellation: CancellationSignal) -> None:
         while True:
@@ -98,6 +101,26 @@ class TraceReconciliationService:
                 expected_span_id=snapshot.expected_span_id,
                 deadline=snapshot.deadline_at,
             )
-            update = await _joined_to_thread(self.store.record_trace_lookup, lease, lookup_result)
+            linked_traces: tuple[LinkedTrace, ...] = ()
+            search_supported = False
+            if self.linked_search_enabled:
+                try:
+                    search_supported = await _joined_to_thread(self.lookup.search_supported)
+                except Exception:
+                    search_supported = False
+            if search_supported:
+                try:
+                    linked_traces = await _joined_to_thread(
+                        self.lookup.search_attempt,
+                        snapshot.attempt_id,
+                        start_at=snapshot.dispatch_at,
+                        end_at=snapshot.deadline_at,
+                        limit=MAX_LINKED_MATCHES,
+                    )
+                except Exception:
+                    linked_traces = ()
+            update = await _joined_to_thread(
+                self.store.record_trace_lookup, lease, lookup_result, linked_traces
+            )
             if update.terminal:
                 return

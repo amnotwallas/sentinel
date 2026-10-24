@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     heartbeat_seconds: float = Field(default=15, ge=0.1, le=60)
     max_deliveries: int = Field(default=3, ge=1, le=3)
     poll_seconds: float = Field(default=1, ge=0.05, le=1)
+    linked_trace_search_enabled: bool = False
     tempo_url: str = "http://127.0.0.1:3200"
     otlp_endpoint: str | None = None
     target_ca_bundle: str | None = Field(default=None, repr=False)

@@ -25,12 +25,15 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TraceReferenceRow,
 )
-from sentinel.persistence.trace_references import validate_evidence
-from sentinel.telemetry.ports import TraceLookup, TraceLookupStatus
+from sentinel.persistence.trace_references import TraceReferenceRepository, validate_evidence
+from sentinel.telemetry.evidence import build_comparison_anchor, build_trace_evidence
+from sentinel.telemetry.ports import LinkedTrace, TraceLookup, TraceLookupStatus
 
 
 @dataclass(frozen=True, slots=True)
 class CorrelationSnapshot:
+    attempt_id: UUID
+    dispatch_at: datetime
     trace_id: str
     expected_span_id: str
     deadline_at: datetime
@@ -249,7 +252,16 @@ class PostgresJobStore:
             if row.kind != "correlate_trace":
                 raise LeaseLost("lease is not a correlation job")
             reference = self._validate_correlation(session, row)
+            attempt = session.scalar(
+                select(TestAttemptRow)
+                .where(TestAttemptRow.id == reference.attempt_id)
+                .with_for_update()
+            )
+            if attempt is None or attempt.dispatch_recorded_at is None:
+                raise LeaseLost("correlation attempt is not dispatched")
             return CorrelationSnapshot(
+                attempt_id=reference.attempt_id,
+                dispatch_at=attempt.dispatch_recorded_at,
                 trace_id=reference.trace_id,
                 expected_span_id=reference.span_id or "",
                 deadline_at=reference.deadline_at,
@@ -258,7 +270,12 @@ class PostgresJobStore:
                 status=reference.status,
             )
 
-    def record_trace_lookup(self, lease: Lease, result: TraceLookup) -> CorrelationUpdate:
+    def record_trace_lookup(
+        self,
+        lease: Lease,
+        result: TraceLookup,
+        linked_traces: tuple[LinkedTrace, ...] = (),
+    ) -> CorrelationUpdate:
         """Persist one safe lookup and terminalize the leased job atomically."""
         with self._transaction() as session:
             row, now = self._owned(session, lease)
@@ -278,26 +295,26 @@ class PostgresJobStore:
             reference.lookup_attempt_count = lookup_count
             reference.status = result.status.value
             reference.last_error_code = result.error_code.value if result.error_code else None
+            linked_count = TraceReferenceRepository.persist_linked_search(
+                session, reference=reference, matches=linked_traces, now=now
+            )
+            previous = (
+                TraceReferenceRepository.latest_compatible_primary(session, reference=reference)
+                if result.status is TraceLookupStatus.AVAILABLE
+                else None
+            )
             reference.evidence_json = validate_evidence(
-                {
-                    "schema_version": 1,
-                    "primary_span_found": result.client_span_id is not None,
-                    "trace_span_count": result.trace_span_count,
-                    "error_span_count": result.error_span_count,
-                    "services": [
-                        {
-                            "name": service.name,
-                            "version": service.version,
-                            "environment": service.environment,
-                            "revision": service.revision,
-                        }
-                        for service in result.services
-                    ],
-                    "deployments": [],
-                    "linked_match_count": 0,
-                    "context_continuity": result.context_continuity.value,
-                    "comparison_anchor": None,
-                }
+                build_trace_evidence(
+                    result,
+                    linked_match_count=linked_count,
+                    comparison_anchor=(
+                        build_comparison_anchor(
+                            previous.id, previous.evidence_json, result.services
+                        )
+                        if previous is not None
+                        else None
+                    ),
+                )
             )
             terminal_status = result.status.value
             terminal = result.status is TraceLookupStatus.AVAILABLE
