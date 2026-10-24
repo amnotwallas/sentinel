@@ -1,5 +1,6 @@
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -24,6 +25,25 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TraceReferenceRow,
 )
+from sentinel.persistence.trace_references import validate_evidence
+from sentinel.telemetry.ports import TraceLookup, TraceLookupStatus
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationSnapshot:
+    trace_id: str
+    expected_span_id: str
+    deadline_at: datetime
+    first_checked_at: datetime | None
+    lookup_attempt_count: int
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationUpdate:
+    terminal: bool
+    status: str
+    lookup_attempt_count: int
 
 
 class PostgresJobStore:
@@ -223,6 +243,101 @@ class PostgresJobStore:
             raise LeaseLost("correlation reference is invalid")
         return reference
 
+    def correlation_snapshot(self, lease: Lease) -> CorrelationSnapshot:
+        with self._transaction() as session:
+            row, _ = self._owned(session, lease)
+            if row.kind != "correlate_trace":
+                raise LeaseLost("lease is not a correlation job")
+            reference = self._validate_correlation(session, row)
+            return CorrelationSnapshot(
+                trace_id=reference.trace_id,
+                expected_span_id=reference.span_id or "",
+                deadline_at=reference.deadline_at,
+                first_checked_at=reference.first_checked_at,
+                lookup_attempt_count=reference.lookup_attempt_count,
+                status=reference.status,
+            )
+
+    def record_trace_lookup(self, lease: Lease, result: TraceLookup) -> CorrelationUpdate:
+        """Persist one safe lookup and terminalize the leased job atomically."""
+        with self._transaction() as session:
+            row, now = self._owned(session, lease)
+            if row.kind != "correlate_trace":
+                raise LeaseLost("lease is not a correlation job")
+            reference = self._validate_correlation(session, row)
+            if result.trace_id != reference.trace_id:
+                raise LeaseLost("lookup identity does not match reference")
+            if reference.lookup_attempt_count >= 7:
+                raise LeaseLost("lookup budget exhausted")
+            if reference.last_checked_at is not None and now < reference.last_checked_at:
+                raise LeaseLost("lookup timestamp moved backwards")
+
+            lookup_count = reference.lookup_attempt_count + 1
+            reference.first_checked_at = reference.first_checked_at or now
+            reference.last_checked_at = now
+            reference.lookup_attempt_count = lookup_count
+            reference.status = result.status.value
+            reference.last_error_code = result.error_code.value if result.error_code else None
+            reference.evidence_json = validate_evidence(
+                {
+                    "schema_version": 1,
+                    "primary_span_found": result.client_span_id is not None,
+                    "trace_span_count": result.trace_span_count,
+                    "error_span_count": result.error_span_count,
+                    "services": [
+                        {
+                            "name": service.name,
+                            "version": service.version,
+                            "environment": service.environment,
+                            "revision": service.revision,
+                        }
+                        for service in result.services
+                    ],
+                    "deployments": [],
+                    "linked_match_count": 0,
+                    "context_continuity": result.context_continuity.value,
+                    "comparison_anchor": None,
+                }
+            )
+            terminal_status = result.status.value
+            terminal = result.status is TraceLookupStatus.AVAILABLE
+            if now >= reference.deadline_at:
+                terminal = True
+                if result.status is TraceLookupStatus.MISSING:
+                    terminal_status = "expired"
+                elif result.status is TraceLookupStatus.TEMPO_UNAVAILABLE:
+                    terminal_status = "tempo_unavailable"
+                else:
+                    terminal_status = result.status.value
+            reference.status = terminal_status
+            reference.updated_at = now
+            if terminal:
+                validate_transition(JobState(row.state), JobState.SUCCEEDED)
+                row.state = JobState.SUCCEEDED
+                row.finished_at = now
+                self._clear_lease(row)
+            return CorrelationUpdate(terminal, terminal_status, lookup_count)
+
+    def finalize_correlation(self, lease: Lease) -> CorrelationUpdate:
+        """Close a lookup window without inventing an outage or trace result."""
+        with self._transaction() as session:
+            row, now = self._owned(session, lease)
+            if row.kind != "correlate_trace":
+                raise LeaseLost("lease is not a correlation job")
+            reference = self._validate_correlation(session, row)
+            if now < reference.deadline_at and reference.lookup_attempt_count < 7:
+                raise LeaseLost("correlation window remains open")
+            if reference.status == "missing":
+                reference.status = "expired"
+            elif reference.status == "pending":
+                reference.status = "expired"
+            reference.updated_at = now
+            validate_transition(JobState(row.state), JobState.SUCCEEDED)
+            row.state = JobState.SUCCEEDED
+            row.finished_at = now
+            self._clear_lease(row)
+            return CorrelationUpdate(True, reference.status, reference.lookup_attempt_count)
+
     def _dead(self, session: Session, row: JobRow, code: ErrorCode, now: datetime) -> None:
         validate_transition(JobState(row.state), JobState.DEAD)
         row.state = JobState.DEAD
@@ -230,7 +345,11 @@ class PostgresJobStore:
         row.finished_at = now
         self._clear_lease(row)
         if row.kind == "correlate_trace":
-            self._validate_correlation(session, row)
+            reference = self._validate_correlation(session, row)
+            if reference.lookup_attempt_count == 0:
+                reference.status = "tempo_unavailable"
+                reference.last_error_code = "correlation_delivery_exhausted"
+                reference.updated_at = now
             return
         execution = self._subject(session, row)
         if self._fail_pending_evaluation(session, execution, now):
