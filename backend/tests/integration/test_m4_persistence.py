@@ -452,3 +452,30 @@ def test_m4_upgrade_round_trip_preserves_legacy_m3_rows(
         )
     downgrade(config, "0009")
     upgrade(config, "head")
+
+
+def test_m4_result_read_projection_is_ordered_and_bounded(engine: Engine) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    ids = _seed_scope(factory, seed=76000000)
+    _evaluated_result(factory, ids)
+
+    record = PostgresExecutionService(factory, clock=lambda: NOW).get_attempt(ids["attempt"])
+
+    assert record is not None
+    assert record.attempt.verdict == "passed"
+    assert record.comparison is not None
+    assert record.comparison.state == "not_requested"
+    assert [evaluation.ordinal for evaluation in record.evaluations] == [0]
+    assert record.evaluations[0].evidence_omitted is False
+
+
+def test_m4_execution_detail_reads_change_evidence_without_raw_values(engine: Engine) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    ids = _seed_scope(factory, seed=76100000)
+    _evaluated_result(factory, ids)
+
+    record = PostgresExecutionService(factory, clock=lambda: NOW).get(ids["execution"])
+
+    assert record is not None
+    assert record.pinned_change_events == ()
+    assert record.change_evidence.events == ()

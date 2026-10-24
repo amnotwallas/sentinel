@@ -1,21 +1,27 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
+from sentinel.catalog.changes import ChangeEvent, ChangeEventKind, ChangeSubjectType, ChangeSummary
 from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
 from sentinel.persistence.attempts import PostgresAttemptStore
 from sentinel.persistence.models import (
     BaselineActivationRow,
+    BaselineComparisonRow,
+    BaselineRow,
+    ChangeEventRow,
     EnvironmentRevisionRow,
     EnvironmentRow,
+    EvaluationRow,
     ExecutionItemRow,
     ExecutionRow,
     IdempotencyRecordRow,
@@ -30,6 +36,12 @@ from sentinel.persistence.models import (
     TestCaseRow,
 )
 from sentinel.regression.policy import canonical_json
+from sentinel.regression.read_models import (
+    ChangeRead,
+    ComparisonRead,
+    EvaluationRead,
+    PromotionRead,
+)
 
 
 class ExecutionError(Exception):
@@ -66,6 +78,8 @@ class ExecutionItemRecord:
     attempts: tuple[AttemptRecord, ...] = ()
     attempt_count: int = 0
     attempts_truncated: bool = False
+    baseline_activation_id: UUID | None = None
+    baseline_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +88,9 @@ class AttemptReadRecord:
     attempt: AttemptRecord
     artifact: ResponseArtifact | None
     read_at: datetime
+    comparison: ComparisonRead | None = None
+    evaluations: tuple[EvaluationRead, ...] = ()
+    promotion: PromotionRead | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +108,8 @@ class ExecutionRecord:
     started_at: datetime | None
     finished_at: datetime | None
     items: tuple[ExecutionItemRecord, ...]
+    pinned_change_events: tuple[ChangeEvent, ...] = ()
+    change_evidence: ChangeRead = ChangeRead(())
 
     @property
     def completed_item_count(self) -> int:
@@ -422,6 +441,10 @@ class PostgresExecutionService:
             )
             if execution_id is None:
                 return None
+            item = session.get(ExecutionItemRow, row.execution_item_id)
+            execution = session.get(ExecutionRow, execution_id)
+            if item is None or execution is None or execution.project_id is None:
+                return None
             artifact_row = session.get(ResponseArtifactRow, attempt_id)
             artifact = (
                 ResponseArtifact(
@@ -444,6 +467,9 @@ class PostgresExecutionService:
                 attempt=PostgresAttemptStore._record(row),
                 artifact=artifact,
                 read_at=self._now(session),
+                comparison=self._comparison(session, row),
+                evaluations=self._evaluations(session, row.id),
+                promotion=self._promotion(session, row, item, execution.environment_id),
             )
 
     def list(
@@ -588,8 +614,15 @@ class PostgresExecutionService:
                     attempts=attempt_records,
                     attempt_count=attempt_count,
                     attempts_truncated=attempts_truncated,
+                    baseline_activation_id=row.baseline_activation_id,
+                    baseline_id=row.baseline_id,
                 )
             )
+        pinned, contextual = (
+            PostgresExecutionService._change_reads(session, execution, items)
+            if include_attempts
+            else ((), ChangeRead(()))
+        )
         return ExecutionRecord(
             id=execution.id,
             project_id=execution.project_id,
@@ -604,4 +637,250 @@ class PostgresExecutionService:
             started_at=execution.started_at,
             finished_at=execution.finished_at,
             items=tuple(items),
+            pinned_change_events=pinned,
+            change_evidence=contextual,
         )
+
+    @staticmethod
+    def _comparison(session: Session, attempt: TestAttemptRow) -> ComparisonRead:
+        empty = {
+            "baseline_activation_id": None,
+            "baseline_id": None,
+            "baseline_version": None,
+            "policy_fingerprint": None,
+            "checked_at": None,
+        }
+        if attempt.result_contract_version == 0 or attempt.evaluation_error_code is not None:
+            return ComparisonRead(state="not_evaluated", **empty)
+        row = session.get(BaselineComparisonRow, attempt.id)
+        if row is not None:
+            return ComparisonRead(
+                state=row.state,
+                baseline_activation_id=row.baseline_activation_id,
+                baseline_id=row.baseline_id,
+                baseline_version=row.baseline_version,
+                policy_fingerprint=row.policy_fingerprint,
+                checked_at=row.checked_at,
+            )
+        if attempt.state in {"prepared", "dispatching", "response_received"}:
+            return ComparisonRead(state="pending", **empty)
+        return ComparisonRead(state="not_evaluated", **empty)
+
+    @staticmethod
+    def _evaluations(session: Session, attempt_id: UUID) -> tuple[EvaluationRead, ...]:
+        return tuple(
+            EvaluationRead(
+                id=row.id,
+                ordinal=row.ordinal,
+                kind=row.kind,
+                rule_id=row.rule_id,
+                severity=row.severity,
+                outcome=row.outcome,
+                message_code=row.message_code,
+                expected=row.expected,
+                actual=row.actual,
+                evidence_omitted=row.evidence_omitted,
+            )
+            for row in session.scalars(
+                select(EvaluationRow)
+                .where(EvaluationRow.attempt_id == attempt_id)
+                .order_by(EvaluationRow.ordinal)
+            )
+        )
+
+    @staticmethod
+    def _promotion(
+        session: Session,
+        attempt: TestAttemptRow,
+        item: ExecutionItemRow,
+        environment_id: UUID | None,
+    ) -> PromotionRead:
+        if attempt.result_contract_version == 0:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        if attempt.state != "evaluated":
+            code = (
+                "evaluation_inconclusive"
+                if attempt.evaluation_error_code is not None
+                else "attempt_not_evaluated"
+            )
+            return PromotionRead(False, (), (code,))
+        if attempt.finished_at is None:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        if environment_id is None:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        from sentinel.persistence.regression import PostgresBaselineRepository
+        from sentinel.regression.baselines import BaselineScope
+
+        test_case = session.get(TestCaseRow, item.test_case_id)
+        if test_case is None:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        revision = session.get(TestCaseRevisionRow, test_case.active_revision_id)
+        if revision is None:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        assessment = PostgresBaselineRepository(session).get_source_assessment(
+            BaselineScope(item.test_case_id, environment_id),
+            attempt.id,
+            current_policy_fingerprint=revision.policy_fingerprint,
+        )
+        if assessment is None:
+            return PromotionRead(False, (), ("attempt_not_evaluated",))
+        return PromotionRead(
+            assessment.eligible,
+            assessment.warning_codes,
+            assessment.ineligibility_codes,
+        )
+
+    @staticmethod
+    def _change_event(row: ChangeEventRow) -> ChangeEvent | None:
+        try:
+            fields = row.summary.get("changed_fields", [])
+            if not isinstance(fields, list) or not all(isinstance(value, str) for value in fields):
+                return None
+            return ChangeEvent(
+                id=row.id,
+                project_id=row.project_id,
+                kind=ChangeEventKind(row.kind),
+                subject_type=ChangeSubjectType(row.subject_type),
+                subject_id=row.subject_id,
+                before_ref=row.before_ref,
+                after_ref=row.after_ref,
+                summary=ChangeSummary.from_values(fields),
+                created_at=row.created_at,
+            )
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _change_reads(
+        session: Session, execution: ExecutionRow, items: Sequence[ExecutionItemRecord]
+    ) -> tuple[tuple[ChangeEvent, ...], ChangeRead]:
+        if execution.project_id is None:
+            return (), ChangeRead(())
+        anchor_conditions: list[Any] = [
+            and_(
+                ChangeEventRow.subject_type == "environment",
+                ChangeEventRow.subject_id == execution.environment_id,
+                ChangeEventRow.after_ref == execution.environment_revision_id,
+                or_(
+                    ChangeEventRow.before_ref.is_(None),
+                    ChangeEventRow.before_ref != ChangeEventRow.after_ref,
+                ),
+            ),
+            and_(
+                ChangeEventRow.subject_type == execution.source_type,
+                ChangeEventRow.subject_id == execution.source_id,
+                ChangeEventRow.after_ref == execution.source_revision_id,
+                or_(
+                    ChangeEventRow.before_ref.is_(None),
+                    ChangeEventRow.before_ref != ChangeEventRow.after_ref,
+                ),
+            ),
+        ]
+        for item in items:
+            anchor_conditions.append(
+                and_(
+                    ChangeEventRow.subject_type == "test_case",
+                    ChangeEventRow.subject_id == item.test_case_id,
+                    ChangeEventRow.after_ref == item.test_case_revision_id,
+                    or_(
+                        ChangeEventRow.before_ref.is_(None),
+                        ChangeEventRow.before_ref != ChangeEventRow.after_ref,
+                    ),
+                )
+            )
+            if item.baseline_id is not None and item.baseline_activation_id is not None:
+                anchor_conditions.append(
+                    and_(
+                        ChangeEventRow.subject_type == "baseline",
+                        ChangeEventRow.subject_id == item.baseline_id,
+                        ChangeEventRow.after_ref == item.baseline_activation_id,
+                    )
+                )
+        anchor_rows = session.scalars(
+            select(ChangeEventRow)
+            .where(
+                ChangeEventRow.project_id == execution.project_id,
+                or_(*cast(Any, anchor_conditions)),
+            )
+            .order_by(ChangeEventRow.created_at, ChangeEventRow.id)
+        )
+        pinned_by_id = {
+            row.id: event
+            for row in anchor_rows
+            if (event := PostgresExecutionService._change_event(row)) is not None
+        }
+
+        baseline_finished: dict[UUID, datetime] = {}
+        for item in items:
+            if item.baseline_id is not None:
+                baseline = session.get(BaselineRow, item.baseline_id)
+                if baseline is not None:
+                    baseline_finished[item.baseline_id] = baseline.source_finished_at
+        contextual_conditions: list[Any] = [
+            and_(
+                ChangeEventRow.subject_type == "environment",
+                ChangeEventRow.subject_id == execution.environment_id,
+            ),
+            and_(
+                ChangeEventRow.subject_type == execution.source_type,
+                ChangeEventRow.subject_id == execution.source_id,
+            ),
+        ]
+        contextual_conditions.extend(
+            and_(
+                ChangeEventRow.subject_type == "test_case",
+                ChangeEventRow.subject_id == item.test_case_id,
+            )
+            for item in items
+        )
+        contextual_conditions.extend(
+            and_(
+                ChangeEventRow.subject_type == "baseline", ChangeEventRow.subject_id == baseline_id
+            )
+            for baseline_id in baseline_finished
+        )
+        contextual_rows = list(
+            session.scalars(
+                select(ChangeEventRow)
+                .where(
+                    ChangeEventRow.project_id == execution.project_id,
+                    ChangeEventRow.created_at <= execution.created_at,
+                    ChangeEventRow.id.not_in(pinned_by_id),
+                    or_(*cast(Any, contextual_conditions)),
+                )
+                .order_by(ChangeEventRow.created_at.desc(), ChangeEventRow.id.desc())
+                .limit(129)
+            )
+        )
+        item_thresholds = [
+            (item, baseline_finished[item.baseline_id])
+            for item in items
+            if item.baseline_id is not None and item.baseline_id in baseline_finished
+        ]
+        contextual: list[ChangeEvent] = []
+        for row in contextual_rows:
+            relevant = any(
+                row.created_at > threshold
+                and (
+                    row.subject_type == "environment"
+                    and row.subject_id == execution.environment_id
+                    or row.subject_type == execution.source_type
+                    and row.subject_id == execution.source_id
+                    or row.subject_type == "test_case"
+                    and row.subject_id == item.test_case_id
+                    or row.subject_type == "baseline"
+                    and row.subject_id == item.baseline_id
+                )
+                for item, threshold in item_thresholds
+            )
+            if not relevant:
+                continue
+            event = PostgresExecutionService._change_event(row)
+            if event is not None:
+                contextual.append(event)
+            if len(contextual) == 129:
+                break
+        truncated = len(contextual) > 128
+        contextual = contextual[:128]
+        contextual.reverse()
+        return tuple(pinned_by_id.values()), ChangeRead(tuple(contextual), truncated)

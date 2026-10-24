@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
+from sentinel.api.baselines import baseline_router
 from sentinel.api.body_limit import BodyLimitMiddleware
 from sentinel.api.catalog.catalog_openapi import catalog_schemas
 from sentinel.api.catalog.environments import environment_router
@@ -32,6 +33,8 @@ from sentinel.execution.creation import PostgresExecutionService
 from sentinel.persistence.catalog.unit_of_work import PostgresCatalogUnitOfWork
 from sentinel.persistence.database import create_database
 from sentinel.persistence.readiness import database_is_current
+from sentinel.persistence.regression import PostgresBaselineUnitOfWork
+from sentinel.regression.baselines import BaselineService
 from sentinel.security.definition_policy import (
     validate_environment_document,
     validate_test_definition,
@@ -48,6 +51,7 @@ class SentinelAPI(FastAPI):
         schema["components"]["schemas"].update(test_case_schemas())
         schema["components"]["schemas"].update(suite_schemas())
         _normalize_execution_openapi(schema)
+        _normalize_regression_openapi(schema)
         # FastAPI always adds its default JSON media type for a documented model.
         # Sentinel problem responses use RFC 9457's dedicated media type instead.
         for path in schema.get("paths", {}).values():
@@ -182,6 +186,69 @@ def _normalize_execution_openapi(schema: dict[str, Any]) -> None:
             parameter["schema"] = timestamp_ref
 
 
+def _normalize_regression_openapi(schema: dict[str, Any]) -> None:
+    schemas = schema.get("components", {}).get("schemas", {})
+    uuid_ref = {"$ref": "#/components/schemas/UUID"}
+    timestamp_ref = {"$ref": "#/components/schemas/Timestamp"}
+    nullable_uuid = {"anyOf": [uuid_ref, {"type": "null"}]}
+    nullable_timestamp = {"anyOf": [timestamp_ref, {"type": "null"}]}
+    uuid_fields = {
+        "BaselineSummary": {
+            "id",
+            "test_case_id",
+            "environment_id",
+            "source_attempt_id",
+            "source_execution_id",
+            "source_test_case_revision_id",
+        },
+        "BaselineActivationSummary": {
+            "id",
+            "test_case_id",
+            "environment_id",
+            "baseline_id",
+        },
+        "BaselineComparisonOutput": {"baseline_activation_id", "baseline_id"},
+        "EvaluationOutput": {"id"},
+    }
+    nullable_uuid_fields = {"BaselineComparisonOutput": {"baseline_activation_id", "baseline_id"}}
+    for name, fields in uuid_fields.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = (
+                    nullable_uuid if field in nullable_uuid_fields.get(name, set()) else uuid_ref
+                )
+    for name, fields in {
+        "BaselineSummary": {"source_finished_at", "created_at"},
+        "BaselineActivationSummary": {"activated_at"},
+    }.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = timestamp_ref
+    for name, fields in {
+        "BaselineSummary": {"activated_at"},
+        "BaselineActivationSummary": {"deactivated_at"},
+        "BaselineComparisonOutput": {"checked_at"},
+    }.items():
+        properties = schemas.get(name, {}).get("properties", {})
+        for field in fields:
+            if field in properties:
+                properties[field] = nullable_timestamp
+
+    for path in (
+        "/api/v1/test-cases/{test_case_id}/baselines",
+        "/api/v1/test-cases/{test_case_id}/baseline-activations",
+    ):
+        for method in ("post",):
+            for parameter in (
+                schema.get("paths", {}).get(path, {}).get(method, {}).get("parameters", [])
+            ):
+                if parameter.get("in") == "header" and parameter.get("name") == "If-Match":
+                    parameter["required"] = True
+                    parameter["schema"] = {"type": "string"}
+
+
 class Liveness(BaseModel):
     status: Literal["alive"] = "alive"
 
@@ -202,6 +269,7 @@ def create_app(
     test_case_service: TestCaseService | None = None,
     suite_service: SuiteService | None = None,
     execution_service: PostgresExecutionService | None = None,
+    baseline_service: BaselineService | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url.get_secret_value())
@@ -249,6 +317,12 @@ def create_app(
     )
     app.include_router(execution_router(executions))
     app.include_router(attempt_router(executions))
+    baselines = baseline_service or BaselineService(
+        lambda: PostgresBaselineUnitOfWork(sessions),
+        ids=uuid4,
+        clock=lambda: datetime.now(UTC),
+    )
+    app.include_router(baseline_router(baselines))
 
     async def tempo_ready() -> bool:
         try:

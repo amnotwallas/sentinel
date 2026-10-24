@@ -33,6 +33,9 @@ class AttemptRecord:
     primary_trace_id: str | None
     client_span_id: str | None
     included_in_verdict: bool
+    result_contract_version: int = 0
+    verdict: str | None = None
+    evaluation_error_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -35,6 +35,7 @@ from sentinel.execution.creation import (
     PostgresExecutionService,
 )
 from sentinel.regression.policy import canonical_json
+from sentinel.regression.read_models import ComparisonRead, EvaluationRead, PromotionRead
 
 _UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 _IDEMPOTENCY_PATTERN = re.compile(r"^[\x21-\x7e]{1,128}$")
@@ -301,6 +302,84 @@ class ResponseObservation(TimestampModel):
     expires_at: datetime
 
 
+class BaselineComparisonOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal[
+        "not_requested", "pending", "not_evaluated", "missing", "incompatible", "compatible"
+    ]
+    baseline_activation_id: UUID | None
+    baseline_id: UUID | None
+    baseline_version: int | None = Field(ge=1)
+    policy_fingerprint: str | None = Field(pattern=r"^[0-9a-f]{64}$")
+    checked_at: datetime | None
+
+
+class EvaluationOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    ordinal: int = Field(ge=0, le=256)
+    kind: Literal["assertion", "baseline_selector", "performance"]
+    rule_id: UUID | None
+    severity: Literal["required", "advisory"]
+    outcome: Literal["passed", "failed", "unevaluable", "not_evaluated"]
+    message_code: Literal[
+        "assertion_passed",
+        "selected_value_match",
+        "duration_within_threshold",
+        "status_mismatch",
+        "header_missing",
+        "header_mismatch",
+        "json_missing",
+        "json_unexpected",
+        "json_type_mismatch",
+        "json_value_mismatch",
+        "text_mismatch",
+        "invalid_json",
+        "selected_value_mismatch",
+        "normalizer_input_invalid",
+        "baseline_missing",
+        "baseline_incompatible",
+        "content_missing",
+        "content_expired",
+        "content_truncated",
+        "content_redacted",
+        "duration_exceeded",
+        "not_evaluated",
+    ]
+    expected: object | None
+    actual: object | None
+    evidence_omitted: bool
+
+
+class BaselinePromotionOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    eligible: bool
+    warning_codes: list[
+        Literal[
+            "missing_baseline",
+            "incompatible_baseline",
+            "observed_change",
+            "performance_warning",
+        ]
+    ] = Field(max_length=4)
+    ineligibility_codes: list[
+        Literal[
+            "no_selectors",
+            "attempt_not_evaluated",
+            "attempt_not_included",
+            "required_functional_check_failed",
+            "evaluation_inconclusive",
+            "selected_value_unavailable",
+            "selected_value_too_large",
+            "policy_mismatch",
+            "scope_mismatch",
+        ]
+    ] = Field(max_length=9)
+
+
 class AttemptDetail(AttemptSummary):
     model_config = ConfigDict(extra="forbid")
 
@@ -309,6 +388,10 @@ class AttemptDetail(AttemptSummary):
     request_fingerprint: str | None = Field(pattern=r"^[0-9a-f]{64}$")
     observation: ResponseObservation | None
     observation_state: ObservationState
+    baseline_comparison: BaselineComparisonOutput
+    evaluations: list[EvaluationOutput] = Field(max_length=257)
+    evaluation_error_code: Literal["platform_evaluation_failure"] | None
+    baseline_promotion: BaselinePromotionOutput
 
 
 class ExecutionItem(TimestampModel):
@@ -349,6 +432,7 @@ class ExecutionDetail(ExecutionSummary):
     items: list[ExecutionItem] = Field(min_length=1, max_length=100)
     change_evidence: list[ChangeEventOutput] = Field(max_length=128)
     change_evidence_truncated: bool
+    pinned_change_events: list[ChangeEventOutput] = Field(max_length=202)
 
 
 class ExecutionPage(BaseModel):
@@ -500,7 +584,7 @@ def _attempt_summary(attempt: AttemptRecord) -> AttemptSummary:
         id=attempt.id,
         sequence=attempt.sequence,
         state=cast(AttemptState, attempt.state),
-        verdict=None,
+        verdict=cast(Verdict | None, attempt.verdict),
         created_at=attempt.created_at,
         dispatch_recorded_at=attempt.dispatch_recorded_at,
         response_recorded_at=attempt.response_recorded_at,
@@ -610,6 +694,78 @@ def _attempt_detail(record: AttemptReadRecord) -> AttemptDetail:
         request_fingerprint=attempt.request_fingerprint,
         observation=observation,
         observation_state=observation_state,
+        baseline_comparison=_comparison_output(getattr(record, "comparison", None)),
+        evaluations=[_evaluation_output(value) for value in getattr(record, "evaluations", ())],
+        evaluation_error_code=cast(
+            Literal["platform_evaluation_failure"] | None,
+            record.attempt.evaluation_error_code,
+        ),
+        baseline_promotion=_promotion_output(getattr(record, "promotion", None)),
+    )
+
+
+def _comparison_output(value: ComparisonRead | None) -> BaselineComparisonOutput:
+    if value is None:
+        return BaselineComparisonOutput(
+            state="not_evaluated",
+            baseline_activation_id=None,
+            baseline_id=None,
+            baseline_version=None,
+            policy_fingerprint=None,
+            checked_at=None,
+        )
+    return BaselineComparisonOutput(
+        state=cast(Any, value.state),
+        baseline_activation_id=value.baseline_activation_id,
+        baseline_id=value.baseline_id,
+        baseline_version=value.baseline_version,
+        policy_fingerprint=value.policy_fingerprint,
+        checked_at=value.checked_at,
+    )
+
+
+def _evaluation_output(value: EvaluationRead) -> EvaluationOutput:
+    return EvaluationOutput(
+        id=value.id,
+        ordinal=value.ordinal,
+        kind=cast(Any, value.kind),
+        rule_id=value.rule_id,
+        severity=cast(Any, value.severity),
+        outcome=cast(Any, value.outcome),
+        message_code=cast(Any, value.message_code),
+        expected=value.expected,
+        actual=value.actual,
+        evidence_omitted=value.evidence_omitted,
+    )
+
+
+def _promotion_output(value: PromotionRead | None) -> BaselinePromotionOutput:
+    if value is None:
+        return BaselinePromotionOutput(
+            eligible=False,
+            warning_codes=[],
+            ineligibility_codes=["attempt_not_evaluated"],
+        )
+    return BaselinePromotionOutput(
+        eligible=value.eligible,
+        warning_codes=list(cast(Any, value.warning_codes)),
+        ineligibility_codes=list(cast(Any, value.ineligibility_codes)),
+    )
+
+
+def _change_output(event: Any) -> ChangeEventOutput:
+    return ChangeEventOutput(
+        id=event.id,
+        project_id=event.project_id,
+        kind=event.kind.value,
+        subject_type=event.subject_type.value,
+        subject_id=event.subject_id,
+        before_ref=event.before_ref,
+        after_ref=event.after_ref,
+        summary=ChangeEventSummary(
+            changed_fields=[field.value for field in event.summary.changed_fields]
+        ),
+        created_at=event.created_at,
     )
 
 
@@ -633,8 +789,9 @@ def _detail(record: ExecutionRecord) -> ExecutionDetail:
             )
             for item in record.items
         ],
-        change_evidence=[],
-        change_evidence_truncated=False,
+        change_evidence=[_change_output(event) for event in record.change_evidence.events],
+        change_evidence_truncated=record.change_evidence.truncated,
+        pinned_change_events=[_change_output(event) for event in record.pinned_change_events],
     )
 
 

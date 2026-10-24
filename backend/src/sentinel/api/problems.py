@@ -38,6 +38,7 @@ ProblemCode = Literal[
     "idempotency_conflict",
     "baseline_ineligible",
     "baseline_incompatible",
+    "baseline_confirmation_required",
     "internal_error",
     "http_error",
 ]
@@ -56,6 +57,7 @@ _PROBLEM_DEFINITIONS: dict[str, tuple[int, str]] = {
     "idempotency_conflict": (409, "Idempotency conflict"),
     "baseline_ineligible": (409, "Baseline ineligible"),
     "baseline_incompatible": (409, "Baseline incompatible"),
+    "baseline_confirmation_required": (409, "Baseline confirmation required"),
     "internal_error": (500, "Internal server error"),
     "http_error": (405, "Request failed"),
 }

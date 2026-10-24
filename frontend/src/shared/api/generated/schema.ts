@@ -194,6 +194,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/test-cases/{test_case_id}/baseline-activations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Baseline */
+        post: operations["activate_baseline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-cases/{test_case_id}/baselines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Baselines */
+        get: operations["list_baselines"];
+        put?: never;
+        /** Promote Baseline */
+        post: operations["promote_baseline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/test-cases/{test_case_id}/revisions": {
         parameters: {
             query?: never;
@@ -252,6 +287,8 @@ export interface components {
         Assertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["HeaderPresentAssertion"] | components["schemas"]["HeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
         /** AttemptDetail */
         AttemptDetail: {
+            baseline_comparison: components["schemas"]["BaselineComparisonOutput"];
+            baseline_promotion: components["schemas"]["BaselinePromotionOutput"];
             /** Client Span Id */
             client_span_id: string | null;
             created_at: components["schemas"]["Timestamp"];
@@ -259,6 +296,10 @@ export interface components {
             dispatch_recorded_at: components["schemas"]["Timestamp"] | null;
             /** Duration Ms */
             duration_ms: number | null;
+            /** Evaluation Error Code */
+            evaluation_error_code: "platform_evaluation_failure" | null;
+            /** Evaluations */
+            evaluations: components["schemas"]["EvaluationOutput"][];
             execution_id: components["schemas"]["UUID"];
             execution_item_id: components["schemas"]["UUID"];
             finished_at: components["schemas"]["Timestamp"] | null;
@@ -312,6 +353,125 @@ export interface components {
             state: components["schemas"]["AttemptState"];
             transport_outcome: components["schemas"]["TransportOutcome"] | null;
             verdict: components["schemas"]["Verdict"] | null;
+        };
+        /** BaselineActivationBody */
+        BaselineActivationBody: {
+            /**
+             * Baseline Id
+             * Format: uuid
+             */
+            baseline_id: string;
+            /**
+             * Environment Id
+             * Format: uuid
+             */
+            environment_id: string;
+            /** Reason */
+            reason: string | null;
+        };
+        /** BaselineActivationSummary */
+        BaselineActivationSummary: {
+            activated_at: components["schemas"]["Timestamp"];
+            baseline_id: components["schemas"]["UUID"];
+            /** Baseline Version */
+            baseline_version: number;
+            deactivated_at: components["schemas"]["Timestamp"] | null;
+            environment_id: components["schemas"]["UUID"];
+            id: components["schemas"]["UUID"];
+            /** Reason */
+            reason: string | null;
+            test_case_id: components["schemas"]["UUID"];
+        };
+        /** BaselineComparisonOutput */
+        BaselineComparisonOutput: {
+            baseline_activation_id: components["schemas"]["UUID"] | null;
+            baseline_id: components["schemas"]["UUID"] | null;
+            /** Baseline Version */
+            baseline_version: number | null;
+            checked_at: components["schemas"]["Timestamp"] | null;
+            /** Policy Fingerprint */
+            policy_fingerprint: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "not_requested" | "pending" | "not_evaluated" | "missing" | "incompatible" | "compatible";
+        };
+        /** BaselineCreateResult */
+        BaselineCreateResult: {
+            activation: components["schemas"]["BaselineActivationSummary"];
+            baseline: components["schemas"]["BaselineSummary"];
+        };
+        /** BaselineLinks */
+        BaselineLinks: {
+            /** Source Attempt */
+            source_attempt: string;
+            /** Test Case */
+            test_case: string;
+        };
+        /** BaselinePage */
+        BaselinePage: {
+            /** Items */
+            items: components["schemas"]["BaselineSummary"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** BaselinePromotionBody */
+        BaselinePromotionBody: {
+            /** Acknowledged Warnings */
+            acknowledged_warnings: ("missing_baseline" | "incompatible_baseline" | "observed_change" | "performance_warning")[];
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: "promote_selected_values";
+            /**
+             * Environment Id
+             * Format: uuid
+             */
+            environment_id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Source Attempt Id
+             * Format: uuid
+             */
+            source_attempt_id: string;
+        };
+        /** BaselinePromotionOutput */
+        BaselinePromotionOutput: {
+            /** Eligible */
+            eligible: boolean;
+            /** Ineligibility Codes */
+            ineligibility_codes: ("no_selectors" | "attempt_not_evaluated" | "attempt_not_included" | "required_functional_check_failed" | "evaluation_inconclusive" | "selected_value_unavailable" | "selected_value_too_large" | "policy_mismatch" | "scope_mismatch")[];
+            /** Warning Codes */
+            warning_codes: ("missing_baseline" | "incompatible_baseline" | "observed_change" | "performance_warning")[];
+        };
+        /** BaselineSummary */
+        BaselineSummary: {
+            activated_at: components["schemas"]["Timestamp"] | null;
+            /** Active */
+            active: boolean;
+            created_at: components["schemas"]["Timestamp"];
+            environment_id: components["schemas"]["UUID"];
+            id: components["schemas"]["UUID"];
+            links: components["schemas"]["BaselineLinks"];
+            /** Policy Fingerprint */
+            policy_fingerprint: string;
+            /** Reason */
+            reason: string | null;
+            source_attempt_id: components["schemas"]["UUID"];
+            /**
+             * Source Attempt Verdict
+             * @enum {string}
+             */
+            source_attempt_verdict: "passed" | "functional_regression" | "performance_warning" | "observed_change" | "inconclusive" | "baseline_required" | "not_evaluated";
+            source_execution_id: components["schemas"]["UUID"];
+            source_finished_at: components["schemas"]["Timestamp"];
+            source_test_case_revision_id: components["schemas"]["UUID"];
+            test_case_id: components["schemas"]["UUID"];
+            /** Version */
+            version: number;
         };
         CIDR: string;
         CanonicalAssertion: components["schemas"]["StatusCodeAssertion"] | components["schemas"]["CanonicalHeaderPresentAssertion"] | components["schemas"]["CanonicalHeaderEqualsAssertion"] | components["schemas"]["JSONPresentAssertion"] | components["schemas"]["JSONAbsentAssertion"] | components["schemas"]["JSONTypeAssertion"] | components["schemas"]["JSONEqualsAssertion"] | components["schemas"]["TextEqualsAssertion"];
@@ -563,6 +723,40 @@ export interface components {
             project_id: components["schemas"]["UUID"];
             updated_at: components["schemas"]["Timestamp"];
         };
+        /** EvaluationOutput */
+        EvaluationOutput: {
+            /** Actual */
+            actual: unknown | null;
+            /** Evidence Omitted */
+            evidence_omitted: boolean;
+            /** Expected */
+            expected: unknown | null;
+            id: components["schemas"]["UUID"];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "assertion" | "baseline_selector" | "performance";
+            /**
+             * Message Code
+             * @enum {string}
+             */
+            message_code: "assertion_passed" | "selected_value_match" | "duration_within_threshold" | "status_mismatch" | "header_missing" | "header_mismatch" | "json_missing" | "json_unexpected" | "json_type_mismatch" | "json_value_mismatch" | "text_mismatch" | "invalid_json" | "selected_value_mismatch" | "normalizer_input_invalid" | "baseline_missing" | "baseline_incompatible" | "content_missing" | "content_expired" | "content_truncated" | "content_redacted" | "duration_exceeded" | "not_evaluated";
+            /** Ordinal */
+            ordinal: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "passed" | "failed" | "unevaluable" | "not_evaluated";
+            /** Rule Id */
+            rule_id: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "required" | "advisory";
+        };
         /** ExecutionCreate */
         ExecutionCreate: components["schemas"]["ExecutionCreateTestCase"] | components["schemas"]["ExecutionCreateSuite"];
         ExecutionCreateSuite: {
@@ -591,6 +785,8 @@ export interface components {
             /** Items */
             items: components["schemas"]["ExecutionItem"][];
             links: components["schemas"]["RelativeLinks"];
+            /** Pinned Change Events */
+            pinned_change_events: components["schemas"]["ChangeEventOutput"][];
             project_id: components["schemas"]["UUID"];
             source_id: components["schemas"]["UUID"];
             source_revision_id: components["schemas"]["UUID"];
@@ -811,7 +1007,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "validation_failed" | "secret_reference_invalid" | "resource_not_found" | "revision_conflict" | "revision_precondition_required" | "resource_conflict" | "request_too_large" | "unsupported_media_type" | "authentication_required" | "forbidden_origin" | "idempotency_conflict" | "baseline_ineligible" | "baseline_incompatible" | "internal_error" | "http_error";
+            code: "validation_failed" | "secret_reference_invalid" | "resource_not_found" | "revision_conflict" | "revision_precondition_required" | "resource_conflict" | "request_too_large" | "unsupported_media_type" | "authentication_required" | "forbidden_origin" | "idempotency_conflict" | "baseline_ineligible" | "baseline_incompatible" | "baseline_confirmation_required" | "internal_error" | "http_error";
             /** Errors */
             errors?: components["schemas"]["FieldError"][];
             /** Status */
@@ -937,6 +1133,15 @@ export interface components {
             title?: "Baseline incompatible";
             /** @constant */
             type?: "urn:sentinel:problem:baseline_incompatible";
+        } | {
+            /** @constant */
+            code?: "baseline_confirmation_required";
+            /** @constant */
+            status?: 409;
+            /** @constant */
+            title?: "Baseline confirmation required";
+            /** @constant */
+            type?: "urn:sentinel:problem:baseline_confirmation_required";
         } | {
             /** @constant */
             code?: "internal_error";
@@ -3067,6 +3272,354 @@ export interface operations {
             };
             /** @description RFC 9457 problem response */
             412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    activate_baseline: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                test_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaselineActivationBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselineActivationSummary"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselineActivationSummary"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_baselines: {
+        parameters: {
+            query: {
+                environment_id: string;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                test_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselinePage"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    promote_baseline: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                test_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaselinePromotionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselineCreateResult"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselineCreateResult"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem response */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

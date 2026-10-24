@@ -95,6 +95,9 @@ class PostgresAttemptStore:
             primary_trace_id=row.primary_trace_id,
             client_span_id=row.client_span_id,
             included_in_verdict=row.included_in_verdict,
+            result_contract_version=row.result_contract_version,
+            verdict=row.verdict,
+            evaluation_error_code=row.evaluation_error_code,
         )
 
     def create_prepared(

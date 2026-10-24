@@ -16,6 +16,7 @@ from sentinel.execution.domain import (
     DispatchCertainty,
     TransportOutcome,
 )
+from sentinel.regression.read_models import ComparisonRead, EvaluationRead, PromotionRead
 
 NOW = datetime(2030, 1, 1, 12, 30, tzinfo=UTC)
 EXECUTION_ID = UUID("00000000-0000-4000-8000-000000000006")
@@ -73,6 +74,29 @@ class MemoryAttemptService:
                         "expires_at": NOW + timedelta(days=7),
                     },
                 )(),
+                "comparison": ComparisonRead(
+                    state="not_requested",
+                    baseline_activation_id=None,
+                    baseline_id=None,
+                    baseline_version=None,
+                    policy_fingerprint=None,
+                    checked_at=NOW,
+                ),
+                "evaluations": (
+                    EvaluationRead(
+                        id=ATTEMPT_ID,
+                        ordinal=0,
+                        kind="assertion",
+                        rule_id=ATTEMPT_ID,
+                        severity="required",
+                        outcome="passed",
+                        message_code="assertion_passed",
+                        expected="synthetic",
+                        actual="synthetic",
+                        evidence_omitted=False,
+                    ),
+                ),
+                "promotion": PromotionRead(True, (), ()),
             },
         )()
 
@@ -114,6 +138,13 @@ async def test_attempt_detail_returns_redacted_observation(client: httpx.AsyncCl
     assert body["observation"]["headers"][1] == {
         "name": "set-cookie",
         "value": "[REDACTED]",
+    }
+    assert body["baseline_comparison"]["state"] == "not_requested"
+    assert body["evaluations"][0]["ordinal"] == 0
+    assert body["baseline_promotion"] == {
+        "eligible": True,
+        "warning_codes": [],
+        "ineligibility_codes": [],
     }
 
 
