@@ -87,6 +87,19 @@ def test_redaction_is_bounded_and_fixed_headers_are_always_redacted() -> None:
     assert "canary" not in repr(result)
 
 
+def test_json_content_type_is_parsed_without_configured_redaction() -> None:
+    result = redact_observation(
+        status_code=200,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        body=b'{"value":"stable"}',
+        max_bytes=256,
+    )
+
+    assert result.body_kind == "json"
+    assert result.body_content == {"value": "stable"}
+    assert result.redaction_unavailable is False
+
+
 def test_redaction_failure_omits_body() -> None:
     result = redact_observation(
         status_code=200,

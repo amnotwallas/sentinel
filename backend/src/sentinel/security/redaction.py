@@ -55,6 +55,15 @@ def _redact_pointer(document: object, parts: list[str]) -> object:
     return document
 
 
+def _is_json_content_type(headers: Mapping[str, str]) -> bool:
+    for name, value in headers.items():
+        if name.lower() != "content-type":
+            continue
+        media_type = value.split(";", 1)[0].strip().lower()
+        return media_type == "application/json" or media_type.endswith("+json")
+    return False
+
+
 def redact_observation(
     *,
     status_code: int,
@@ -99,7 +108,7 @@ def redact_observation(
         source = body[:max_bytes]
         source_bytes = len(source)
         truncated = len(body) > max_bytes
-        if json_pointers:
+        if json_pointers or _is_json_content_type(safe_headers):
             try:
                 parsed = json.loads(source.decode("utf-8"), parse_float=Decimal)
             except (UnicodeDecodeError, ValueError, TypeError):
