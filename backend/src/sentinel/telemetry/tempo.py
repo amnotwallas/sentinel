@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 import ssl
@@ -106,6 +108,20 @@ def _valid_span_id(value: object) -> bool:
         and SPAN_ID_PATTERN.fullmatch(value) is not None
         and set(value) != {"0"}
     )
+
+
+def _tempo_id(value: object, size: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    if len(value) == size * 2 and re.fullmatch(r"[0-9a-f]+", value) is not None:
+        return value if set(value) != {"0"} else None
+    try:
+        decoded = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if len(decoded) != size or not any(decoded):
+        return None
+    return decoded.hex()
 
 
 def _bounded_text(value: object) -> str | None:
@@ -422,13 +438,16 @@ class TempoLookupAdapter(TraceLookupPort):
                             context_continuity=ContextContinuity.UNKNOWN,
                         )
                     spans.append(span)
-        valid_spans = [
-            span
-            for span in spans
-            if _valid_trace_id(span.get("traceId"))
-            and span.get("traceId") == trace_id
-            and _valid_span_id(span.get("spanId"))
-        ]
+        valid_spans: list[dict[str, Any]] = []
+        for span in spans:
+            normalized_trace_id = _tempo_id(span.get("traceId"), 16)
+            normalized_span_id = _tempo_id(span.get("spanId"), 8)
+            if normalized_trace_id != trace_id or normalized_span_id is None:
+                continue
+            normalized_span = dict(span)
+            normalized_span["traceId"] = normalized_trace_id
+            normalized_span["spanId"] = normalized_span_id
+            valid_spans.append(normalized_span)
         matching = next(
             (span for span in valid_spans if span.get("spanId") == expected_span_id), None
         )

@@ -280,7 +280,9 @@ class AttemptSummary(TimestampModel):
     links: RelativeLinks
 
 
-def _safe_evidence_text(value: str) -> str:
+def _safe_evidence_text(value: str | None) -> str | None:
+    if value is None:
+        return None
     if (
         not value
         or len(value.encode("utf-8")) > 128

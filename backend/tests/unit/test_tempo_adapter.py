@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
@@ -89,6 +90,32 @@ def test_direct_lookup_classifies_available_and_sorts_safe_evidence() -> None:
     assert result.error_span_count == 1
     assert result.context_continuity is ContextContinuity.CONNECTED
     assert [service.name for service in result.services] == ["a-api", "z-api"]
+
+
+def test_direct_lookup_decodes_tempo_otlp_base64_ids() -> None:
+    document = payload()
+    batches = document["batches"]
+    assert isinstance(batches, list)
+    for batch in batches:
+        assert isinstance(batch, dict)
+        scopes = batch["scopeSpans"]
+        assert isinstance(scopes, list)
+        for scope in scopes:
+            assert isinstance(scope, dict)
+            spans = scope["spans"]
+            assert isinstance(spans, list)
+            for span in spans:
+                assert isinstance(span, dict)
+                for key in ("traceId", "spanId"):
+                    value = span[key]
+                    assert isinstance(value, str)
+                    span[key] = base64.b64encode(bytes.fromhex(value)).decode()
+
+    with adapter(httpx.MockTransport(lambda _: httpx.Response(200, json=document))) as tempo:
+        result = lookup(tempo)
+
+    assert result.status is TraceLookupStatus.AVAILABLE
+    assert result.client_span_id == SPAN_ID
 
 
 def test_missing_and_partial_trace_are_distinct() -> None:

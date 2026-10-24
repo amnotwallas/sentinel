@@ -161,8 +161,8 @@ def test_attempt_detail_returns_ordered_bounded_trace_evidence_and_safe_link() -
         "primary_span_found": True,
         "trace_span_count": 2,
         "error_span_count": 0,
-        "services": [{"name": "api", "version": "1", "environment": "prod", "revision": "r1"}],
-        "deployments": [{"service": "api", "environment": "prod", "revision": "r1"}],
+        "services": [{"name": "api", "version": None, "environment": None, "revision": None}],
+        "deployments": [{"service": "api", "environment": None, "revision": None}],
         "linked_match_count": 1,
         "context_continuity": "connected",
         "comparison_anchor": {
