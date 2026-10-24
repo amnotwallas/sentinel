@@ -9,7 +9,7 @@ import pytest
 from sentinel.api.app import create_app
 from sentinel.api.executions import _attempt_detail
 from sentinel.config import Settings
-from sentinel.execution.attempts import AttemptRecord
+from sentinel.execution.attempts import AttemptRecord, TraceReferenceRecord
 from sentinel.execution.creation import AttemptReadRecord, PostgresExecutionService
 from sentinel.execution.domain import (
     AttemptState,
@@ -48,6 +48,9 @@ def _attempt() -> AttemptRecord:
 
 
 class MemoryAttemptService:
+    def __init__(self, trace_references: tuple[TraceReferenceRecord, ...] = ()) -> None:
+        self.trace_references = trace_references
+
     def get_attempt(self, attempt_id: UUID) -> object:
         if attempt_id != ATTEMPT_ID:
             return None
@@ -97,6 +100,8 @@ class MemoryAttemptService:
                     ),
                 ),
                 "promotion": PromotionRead(True, (), ()),
+                "trace_references": self.trace_references,
+                "trace_references_truncated": False,
             },
         )()
 
@@ -146,6 +151,77 @@ async def test_attempt_detail_returns_redacted_observation(client: httpx.AsyncCl
         "warning_codes": [],
         "ineligibility_codes": [],
     }
+    assert body["trace_references"] == []
+    assert body["trace_references_truncated"] is False
+
+
+def test_attempt_detail_returns_ordered_bounded_trace_evidence_and_safe_link() -> None:
+    evidence = {
+        "schema_version": 1,
+        "primary_span_found": True,
+        "trace_span_count": 2,
+        "error_span_count": 0,
+        "services": [{"name": "api", "version": "1", "environment": "prod", "revision": "r1"}],
+        "deployments": [{"service": "api", "environment": "prod", "revision": "r1"}],
+        "linked_match_count": 1,
+        "context_continuity": "connected",
+        "comparison_anchor": {
+            "reference_id": str(ATTEMPT_ID),
+            "changed": [{"name": "api", "fields": ["version"]}],
+        },
+    }
+    references = (
+        TraceReferenceRecord(
+            id=UUID("00000000-0000-4000-8000-000000000010"),
+            relation="linked",
+            trace_id="d" * 32,
+            span_id=None,
+            correlation_source="baggage_attribute_search",
+            status="partial",
+            first_checked_at=NOW,
+            last_checked_at=NOW,
+            deadline_at=NOW + timedelta(minutes=1),
+            lookup_attempt_count=2,
+            last_error_code="invalid_trace",
+            evidence_json=evidence,
+        ),
+        TraceReferenceRecord(
+            id=UUID("00000000-0000-4000-8000-000000000011"),
+            relation="primary",
+            trace_id="b" * 32,
+            span_id="c" * 16,
+            correlation_source="sentinel_context",
+            status="available",
+            first_checked_at=NOW,
+            last_checked_at=NOW,
+            deadline_at=NOW + timedelta(minutes=1),
+            lookup_attempt_count=1,
+            last_error_code=None,
+            evidence_json=evidence,
+        ),
+    )
+    record = AttemptReadRecord(
+        execution_id=EXECUTION_ID,
+        attempt=_attempt(),
+        artifact=None,
+        read_at=NOW,
+        trace_references=references,
+        trace_references_truncated=True,
+    )
+
+    detail = _attempt_detail(
+        record, tempo_trace_url_template="https://grafana.example.test/traces/{trace_id}"
+    )
+    body = detail.model_dump(mode="json")
+
+    assert [item["relation"] for item in body["trace_references"]] == ["primary", "linked"]
+    assert body["trace_references"][0]["tempo_url"] == (
+        f"https://grafana.example.test/traces/{'b' * 32}"
+    )
+    assert body["trace_references"][0]["first_checked_at"] == "2030-01-01T12:30:00.000000Z"
+    assert body["trace_references"][1]["evidence"] == evidence
+    assert body["trace_references_truncated"] is True
+    assert "raw" not in detail.model_dump_json()
 
 
 async def test_unknown_attempt_is_not_found(client: httpx.AsyncClient) -> None:

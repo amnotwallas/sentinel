@@ -136,6 +136,7 @@ def _normalize_execution_openapi(schema: dict[str, Any]) -> None:
         "ExecutionItem": {"started_at", "finished_at"},
         "ExecutionSummary": {"started_at", "finished_at"},
         "ExecutionDetail": {"started_at", "finished_at"},
+        "TraceReferenceOutput": {"first_checked_at", "last_checked_at", "deadline_at"},
     }
     for name, fields in required_timestamps.items():
         properties = schemas.get(name, {}).get("properties", {})
@@ -314,9 +315,12 @@ def create_app(
         ids=uuid4,
         clock=lambda: datetime.now(UTC),
         max_deliveries=settings.max_deliveries,
+        tracer=tracer,
     )
     app.include_router(execution_router(executions))
-    app.include_router(attempt_router(executions))
+    app.include_router(
+        attempt_router(executions, tempo_trace_url_template=settings.tempo_trace_url_template)
+    )
     baselines = baseline_service or BaselineService(
         lambda: PostgresBaselineUnitOfWork(sessions),
         ids=uuid4,
@@ -345,7 +349,7 @@ def create_app(
             if not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")):
                 return problem(401, "authentication_required", "Authentication required")
         with tracer.start_as_current_span(
-            "api.request",
+            "sentinel.api.request",
             record_exception=False,
             set_status_on_exception=False,
             attributes={"http.request.method": request.method},
@@ -355,6 +359,10 @@ def create_app(
             except Exception:
                 response = problem(500, "internal_error", "Internal server error")
             span.set_attribute("http.response.status_code", response.status_code)
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None)
+            if isinstance(route_path, str):
+                span.set_attribute("http.route", route_path)
             return response
 
     @app.exception_handler(HTTPException)

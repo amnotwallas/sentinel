@@ -7,12 +7,14 @@ from hashlib import sha256
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+from opentelemetry import trace
+from opentelemetry.trace import Tracer
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from sentinel.catalog.changes import ChangeEvent, ChangeEventKind, ChangeSubjectType, ChangeSummary
-from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
+from sentinel.execution.attempts import AttemptRecord, ResponseArtifact, TraceReferenceRecord
 from sentinel.persistence.attempts import PostgresAttemptStore
 from sentinel.persistence.models import (
     BaselineActivationRow,
@@ -35,6 +37,7 @@ from sentinel.persistence.models import (
     TestCaseRevisionRow,
     TestCaseRow,
 )
+from sentinel.persistence.trace_references import TraceReferenceRepository
 from sentinel.regression.policy import canonical_json
 from sentinel.regression.read_models import (
     ChangeRead,
@@ -91,6 +94,8 @@ class AttemptReadRecord:
     comparison: ComparisonRead | None = None
     evaluations: tuple[EvaluationRead, ...] = ()
     promotion: PromotionRead | None = None
+    trace_references: tuple[TraceReferenceRecord, ...] = ()
+    trace_references_truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +160,7 @@ class PostgresExecutionService:
         ids: Callable[[], UUID] = uuid4,
         clock: Callable[[], datetime] | None = None,
         max_deliveries: int = 3,
+        tracer: Tracer | None = None,
     ) -> None:
         if not 1 <= max_deliveries <= 3:
             raise ValueError("max_deliveries must be between 1 and 3")
@@ -162,6 +168,7 @@ class PostgresExecutionService:
         self.ids = ids
         self.clock = clock
         self.max_deliveries = max_deliveries
+        self.tracer = tracer or trace.get_tracer(__name__)
 
     def _now(self, session: Session) -> datetime:
         if self.clock is not None:
@@ -420,6 +427,15 @@ class PostgresExecutionService:
         The join keeps an attempt readable only when it belongs to a materialized,
         non-deleted project execution.  No request document or lease data is read.
         """
+        with self.tracer.start_as_current_span(
+            "sentinel.db.operation",
+            record_exception=False,
+            set_status_on_exception=False,
+            attributes={"sentinel.operation.kind": "attempt.read"},
+        ):
+            return self._get_attempt(attempt_id)
+
+    def _get_attempt(self, attempt_id: UUID) -> AttemptReadRecord | None:
         with self.sessions() as session:
             row = session.scalar(
                 select(TestAttemptRow)
@@ -462,6 +478,13 @@ class PostgresExecutionService:
                 if artifact_row is not None
                 else None
             )
+            trace_references = TraceReferenceRepository.read_for_attempt(
+                session,
+                attempt_id=row.id,
+                execution_id=execution_id,
+                execution_item_id=item.id,
+                project_id=execution.project_id,
+            )
             return AttemptReadRecord(
                 execution_id=execution_id,
                 attempt=PostgresAttemptStore._record(row),
@@ -470,6 +493,8 @@ class PostgresExecutionService:
                 comparison=self._comparison(session, row),
                 evaluations=self._evaluations(session, row.id),
                 promotion=self._promotion(session, row, item, execution.environment_id),
+                trace_references=trace_references[:17],
+                trace_references_truncated=len(trace_references) > 17,
             )
 
     def list(

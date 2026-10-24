@@ -7,6 +7,9 @@ from typing import cast
 from uuid import UUID
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from sentinel.execution.domain import InfrastructureFailure, Lease
 from sentinel.execution.ports import DispatchCancelled
@@ -107,6 +110,32 @@ async def test_durably_completed_handler_is_not_completed_twice() -> None:
     assert service.started == 1
     assert service.completed == 0
     assert service.failed == 0
+
+
+async def test_worker_spans_use_safe_job_metadata() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    service = RecordingService()
+
+    async def handler(lease: Lease, cancellation: WorkerCancellation) -> HandlerCompletion:
+        return HandlerCompletion.AUTOMATIC
+
+    worker = Worker(
+        cast(WorkService, service),
+        LEASE.owner,
+        handlers={LEASE.kind: handler},
+        tracer=provider.get_tracer("sentinel.test"),
+    )
+
+    assert await worker.run_once()
+    spans = exporter.get_finished_spans()
+    assert [span.name for span in spans] == ["sentinel.job.claim", "sentinel.job.handle"]
+    for span in spans:
+        assert span.attributes == {
+            "sentinel.job.kind": LEASE.kind,
+            "sentinel.job.delivery": LEASE.delivery_count,
+        }
 
 
 async def test_heartbeat_failure_signals_running_handler_before_returning() -> None:

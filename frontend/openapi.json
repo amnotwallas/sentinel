@@ -223,6 +223,18 @@
           "state": {
             "$ref": "#/components/schemas/AttemptState"
           },
+          "trace_references": {
+            "items": {
+              "$ref": "#/components/schemas/TraceReferenceOutput"
+            },
+            "maxItems": 17,
+            "title": "Trace References",
+            "type": "array"
+          },
+          "trace_references_truncated": {
+            "title": "Trace References Truncated",
+            "type": "boolean"
+          },
           "transport_outcome": {
             "anyOf": [
               {
@@ -271,7 +283,9 @@
           "baseline_comparison",
           "evaluations",
           "evaluation_error_code",
-          "baseline_promotion"
+          "baseline_promotion",
+          "trace_references",
+          "trace_references_truncated"
         ],
         "title": "AttemptDetail",
         "type": "object"
@@ -1618,6 +1632,51 @@
         },
         "required": ["changed_fields"],
         "title": "ChangeEventSummary",
+        "type": "object"
+      },
+      "ComparisonAnchorChangeOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "items": {
+              "enum": ["name", "version", "environment", "revision"],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": ["name", "fields"],
+        "title": "ComparisonAnchorChangeOutput",
+        "type": "object"
+      },
+      "ComparisonAnchorOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonAnchorChangeOutput"
+            },
+            "maxItems": 32,
+            "title": "Changed",
+            "type": "array"
+          },
+          "reference_id": {
+            "format": "uuid",
+            "title": "Reference Id",
+            "type": "string"
+          }
+        },
+        "required": ["reference_id", "changed"],
+        "title": "ComparisonAnchorOutput",
         "type": "object"
       },
       "ComparisonPolicy": {
@@ -4407,6 +4466,317 @@
         "minLength": 27,
         "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$",
         "type": "string"
+      },
+      "TraceDeploymentEvidenceOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "service": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Service",
+            "type": "string"
+          }
+        },
+        "required": ["service"],
+        "title": "TraceDeploymentEvidenceOutput",
+        "type": "object"
+      },
+      "TraceEvidenceOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "comparison_anchor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonAnchorOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context_continuity": {
+            "enum": ["connected", "broken", "unknown"],
+            "title": "Context Continuity",
+            "type": "string"
+          },
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/TraceDeploymentEvidenceOutput"
+            },
+            "maxItems": 32,
+            "title": "Deployments",
+            "type": "array"
+          },
+          "error_span_count": {
+            "maximum": 256.0,
+            "minimum": 0.0,
+            "title": "Error Span Count",
+            "type": "integer"
+          },
+          "linked_match_count": {
+            "maximum": 16.0,
+            "minimum": 0.0,
+            "title": "Linked Match Count",
+            "type": "integer"
+          },
+          "primary_span_found": {
+            "title": "Primary Span Found",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/TraceServiceEvidenceOutput"
+            },
+            "maxItems": 32,
+            "title": "Services",
+            "type": "array"
+          },
+          "trace_span_count": {
+            "maximum": 256.0,
+            "minimum": 0.0,
+            "title": "Trace Span Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "primary_span_found",
+          "trace_span_count",
+          "error_span_count",
+          "services",
+          "deployments",
+          "linked_match_count",
+          "context_continuity",
+          "comparison_anchor"
+        ],
+        "title": "TraceEvidenceOutput",
+        "type": "object"
+      },
+      "TraceReferenceOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_source": {
+            "enum": ["sentinel_context", "baggage_attribute_search"],
+            "title": "Correlation Source",
+            "type": "string"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceEvidenceOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "first_checked_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_found",
+                  "unavailable",
+                  "timeout",
+                  "bad_response",
+                  "oversized_response",
+                  "unsupported",
+                  "transport_error",
+                  "invalid_trace",
+                  "correlation_delivery_exhausted"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "lookup_attempt_count": {
+            "maximum": 7.0,
+            "minimum": 0.0,
+            "title": "Lookup Attempt Count",
+            "type": "integer"
+          },
+          "relation": {
+            "enum": ["primary", "linked"],
+            "title": "Relation",
+            "type": "string"
+          },
+          "span_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{16}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span Id"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "missing",
+              "available",
+              "partial",
+              "tempo_unavailable",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tempo_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "pattern": "^https?://",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tempo Url"
+          },
+          "trace_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "relation",
+          "trace_id",
+          "span_id",
+          "correlation_source",
+          "status",
+          "first_checked_at",
+          "last_checked_at",
+          "deadline_at",
+          "lookup_attempt_count",
+          "last_error_code",
+          "evidence",
+          "tempo_url"
+        ],
+        "title": "TraceReferenceOutput",
+        "type": "object"
+      },
+      "TraceServiceEvidenceOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": ["name"],
+        "title": "TraceServiceEvidenceOutput",
+        "type": "object"
       },
       "TransportOutcome": {
         "enum": [

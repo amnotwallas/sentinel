@@ -13,6 +13,8 @@ from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
 import httpx
+from opentelemetry import trace
+from opentelemetry.trace import Span, Tracer
 
 from sentinel.telemetry.ports import (
     ContextContinuity,
@@ -186,11 +188,13 @@ class TempoLookupAdapter(TraceLookupPort):
         verify: bool | ssl.SSLContext = True,
         transport: httpx.BaseTransport | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        tracer: Tracer | None = None,
     ) -> None:
         if verify is False:
             raise TempoTLSConfigurationError
         self.base_url = validate_tempo_url(base_url)
         self._clock = clock
+        self._tracer = tracer or trace.get_tracer(__name__)
         self._client = httpx.Client(
             base_url=self.base_url,
             follow_redirects=False,
@@ -255,6 +259,25 @@ class TempoLookupAdapter(TraceLookupPort):
         )
 
     def lookup(
+        self,
+        trace_id: str,
+        *,
+        expected_span_id: str,
+        deadline: datetime,
+    ) -> TraceLookup:
+        with self._tracer.start_as_current_span(
+            "sentinel.tempo.lookup",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            result = self._lookup(trace_id, expected_span_id=expected_span_id, deadline=deadline)
+            span.set_attribute("sentinel.outcome", result.status.value)
+            if result.error_code is not None:
+                span.set_attribute("sentinel.error_code", result.error_code.value)
+            span.set_attribute("sentinel.response.size", result.response_size_bytes)
+            return result
+
+    def _lookup(
         self,
         trace_id: str,
         *,
@@ -485,9 +508,30 @@ class TempoLookupAdapter(TraceLookupPort):
         end_at: datetime,
         limit: int,
     ) -> tuple[LinkedTrace, ...]:
+        with self._tracer.start_as_current_span(
+            "sentinel.tempo.search",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            results = self._search_attempt(
+                attempt_id, start_at=start_at, end_at=end_at, limit=limit, span=span
+            )
+            span.set_attribute("sentinel.outcome", "available" if results else "empty")
+            return results
+
+    def _search_attempt(
+        self,
+        attempt_id: UUID,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        limit: int,
+        span: Span,
+    ) -> tuple[LinkedTrace, ...]:
         """Return only bounded results of the exact attempt-baggage search."""
         limit = min(max(limit, 0), MAX_LINKED_TRACES)
         if limit == 0:
+            span.set_attribute("sentinel.response.size", 0)
             return ()
         try:
             self._remaining(end_at)
@@ -502,9 +546,12 @@ class TempoLookupAdapter(TraceLookupPort):
                 },
             ) as response:
                 if response.status_code != 200:
+                    span.set_attribute("sentinel.response.size", 0)
                     return ()
                 body = self._read_body(response, end_at)
+                span.set_attribute("sentinel.response.size", len(body))
         except Exception:
+            span.set_attribute("sentinel.response.size", 0)
             return ()
         try:
             document = json.loads(body)
@@ -514,17 +561,17 @@ class TempoLookupAdapter(TraceLookupPort):
             return ()
 
         matches: dict[str, set[ServiceEvidence]] = {}
-        for trace in document["traces"]:
-            if not isinstance(trace, dict):
+        for trace_document in document["traces"]:
+            if not isinstance(trace_document, dict):
                 continue
-            raw_trace_id = trace.get("traceID")
+            raw_trace_id = trace_document.get("traceID")
             if not isinstance(raw_trace_id, str):
                 continue
             trace_id = raw_trace_id.lower()
             if not _valid_trace_id(trace_id):
                 continue
             services = matches.setdefault(trace_id, set())
-            span_sets = trace.get("spanSets", trace.get("spanSet", []))
+            span_sets = trace_document.get("spanSets", trace_document.get("spanSet", []))
             if isinstance(span_sets, dict):
                 span_sets = [span_sets]
             if not isinstance(span_sets, list):

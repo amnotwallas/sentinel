@@ -6,6 +6,9 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
+from opentelemetry import trace
+from opentelemetry.trace import Tracer
+
 from sentinel.execution.domain import Lease
 from sentinel.execution.ports import CancellationSignal
 from sentinel.persistence.queue import PostgresJobStore
@@ -50,12 +53,14 @@ class TraceReconciliationService:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         delay: Delay = asyncio.sleep,
         linked_search_enabled: bool = False,
+        tracer: Tracer | None = None,
     ) -> None:
         self.store = store
         self.lookup = lookup
         self.clock = clock
         self.delay = delay
         self.linked_search_enabled = linked_search_enabled
+        self.tracer = tracer or trace.get_tracer(__name__)
 
     async def _wait_until(self, due: datetime, cancellation: CancellationSignal) -> None:
         while True:
@@ -71,6 +76,14 @@ class TraceReconciliationService:
             await self.delay(min(remaining, _SCHEDULER_TICK_SECONDS))
 
     async def reconcile(self, lease: Lease, cancellation: CancellationSignal) -> None:
+        with self.tracer.start_as_current_span(
+            "sentinel.trace.reconcile",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
+            await self._reconcile(lease, cancellation)
+
+    async def _reconcile(self, lease: Lease, cancellation: CancellationSignal) -> None:
         while True:
             cancellation.raise_if_cancelled()
             snapshot = await _joined_to_thread(self.store.correlation_snapshot, lease)

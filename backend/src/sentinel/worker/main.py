@@ -43,7 +43,7 @@ async def run(settings: Settings) -> None:
     worker_tracer = tracing.get_tracer(__name__)
     orchestrator = build_execution_orchestrator(sessions, settings, worker_tracer)
     jobs = PostgresJobStore(sessions)
-    tempo = TempoLookupAdapter(settings.tempo_url)
+    tempo = TempoLookupAdapter(settings.tempo_url, tracer=worker_tracer)
     worker = Worker(
         WorkService(jobs, settings.lease_seconds, settings.max_deliveries),
         uuid4(),
@@ -53,7 +53,10 @@ async def run(settings: Settings) -> None:
             "execute_execution": execution_handler(orchestrator),
             "correlate_trace": reconciliation_handler(
                 TraceReconciliationService(
-                    jobs, tempo, linked_search_enabled=settings.linked_trace_search_enabled
+                    jobs,
+                    tempo,
+                    linked_search_enabled=settings.linked_trace_search_enabled,
+                    tracer=worker_tracer,
                 )
             ),
         },

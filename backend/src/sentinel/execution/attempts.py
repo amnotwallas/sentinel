@@ -50,3 +50,19 @@ class ResponseArtifact:
     redaction_unavailable: bool
     recorded_at: datetime
     expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class TraceReferenceRecord:
+    id: UUID
+    relation: str
+    trace_id: str
+    span_id: str | None
+    correlation_source: str
+    status: str
+    first_checked_at: datetime | None
+    last_checked_at: datetime | None
+    deadline_at: datetime
+    lookup_attempt_count: int
+    last_error_code: str | None
+    evidence_json: dict[str, object] | None

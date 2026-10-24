@@ -320,6 +320,10 @@ export interface components {
             /** Sequence */
             sequence: number;
             state: components["schemas"]["AttemptState"];
+            /** Trace References */
+            trace_references: components["schemas"]["TraceReferenceOutput"][];
+            /** Trace References Truncated */
+            trace_references_truncated: boolean;
             transport_outcome: components["schemas"]["TransportOutcome"] | null;
             verdict: components["schemas"]["Verdict"] | null;
         };
@@ -630,6 +634,23 @@ export interface components {
         ChangeEventSummary: {
             /** Changed Fields */
             changed_fields: ("name" | "base_url" | "variables" | "secret_references" | "target_policy" | "request" | "assertions" | "comparison_policy" | "redaction" | "allow_unsafe_replay" | "suite_items" | "baseline_activation")[];
+        };
+        /** ComparisonAnchorChangeOutput */
+        ComparisonAnchorChangeOutput: {
+            /** Fields */
+            fields: ("name" | "version" | "environment" | "revision")[];
+            /** Name */
+            name: string;
+        };
+        /** ComparisonAnchorOutput */
+        ComparisonAnchorOutput: {
+            /** Changed */
+            changed: components["schemas"]["ComparisonAnchorChangeOutput"][];
+            /**
+             * Reference Id
+             * Format: uuid
+             */
+            reference_id: string;
         };
         ComparisonPolicy: {
             /** @default false */
@@ -1475,6 +1496,89 @@ export interface components {
         };
         /** Format: date-time */
         Timestamp: string;
+        /** TraceDeploymentEvidenceOutput */
+        TraceDeploymentEvidenceOutput: {
+            /** Environment */
+            environment?: string | null;
+            /** Revision */
+            revision?: string | null;
+            /** Service */
+            service: string;
+        };
+        /** TraceEvidenceOutput */
+        TraceEvidenceOutput: {
+            comparison_anchor: components["schemas"]["ComparisonAnchorOutput"] | null;
+            /**
+             * Context Continuity
+             * @enum {string}
+             */
+            context_continuity: "connected" | "broken" | "unknown";
+            /** Deployments */
+            deployments: components["schemas"]["TraceDeploymentEvidenceOutput"][];
+            /** Error Span Count */
+            error_span_count: number;
+            /** Linked Match Count */
+            linked_match_count: number;
+            /** Primary Span Found */
+            primary_span_found: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /** Services */
+            services: components["schemas"]["TraceServiceEvidenceOutput"][];
+            /** Trace Span Count */
+            trace_span_count: number;
+        };
+        /** TraceReferenceOutput */
+        TraceReferenceOutput: {
+            /**
+             * Correlation Source
+             * @enum {string}
+             */
+            correlation_source: "sentinel_context" | "baggage_attribute_search";
+            deadline_at: components["schemas"]["Timestamp"] | null;
+            evidence: components["schemas"]["TraceEvidenceOutput"] | null;
+            first_checked_at: components["schemas"]["Timestamp"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            last_checked_at: components["schemas"]["Timestamp"] | null;
+            /** Last Error Code */
+            last_error_code: ("not_found" | "unavailable" | "timeout" | "bad_response" | "oversized_response" | "unsupported" | "transport_error" | "invalid_trace" | "correlation_delivery_exhausted") | null;
+            /** Lookup Attempt Count */
+            lookup_attempt_count: number;
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "primary" | "linked";
+            /** Span Id */
+            span_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "missing" | "available" | "partial" | "tempo_unavailable" | "expired";
+            /** Tempo Url */
+            tempo_url: string | null;
+            /** Trace Id */
+            trace_id: string;
+        };
+        /** TraceServiceEvidenceOutput */
+        TraceServiceEvidenceOutput: {
+            /** Environment */
+            environment?: string | null;
+            /** Name */
+            name: string;
+            /** Revision */
+            revision?: string | null;
+            /** Version */
+            version?: string | null;
+        };
         /**
          * TransportOutcome
          * @enum {string}

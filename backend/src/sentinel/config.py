@@ -9,6 +9,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sentinel.telemetry.tempo import validate_tempo_url
 
 
+def validate_tempo_trace_url_template(value: str | None) -> str | None:
+    if value is None:
+        return None
+    remainder = value.replace("{trace_id}", "")
+    if value.count("{trace_id}") != 1 or "{" in remainder or "}" in remainder:
+        raise ValueError("tempo_trace_url_template_invalid")
+    rendered = value.replace("{trace_id}", "a" * 32)
+    try:
+        validate_tempo_url(rendered)
+    except ValueError:
+        raise ValueError("tempo_trace_url_template_invalid") from None
+    return value
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SENTINEL_", extra="ignore")
 
@@ -24,6 +38,7 @@ class Settings(BaseSettings):
     poll_seconds: float = Field(default=1, ge=0.05, le=1)
     linked_trace_search_enabled: bool = False
     tempo_url: str = "http://127.0.0.1:3200"
+    tempo_trace_url_template: str | None = None
     otlp_endpoint: str | None = None
     target_ca_bundle: str | None = Field(default=None, repr=False)
 
@@ -40,6 +55,7 @@ class Settings(BaseSettings):
         if self.heartbeat_seconds >= self.lease_seconds / 2:
             raise ValueError("heartbeat must be less than half the lease duration")
         validate_tempo_url(self.tempo_url)
+        validate_tempo_trace_url_template(self.tempo_trace_url_template)
         if self.target_ca_bundle is not None:
             path = Path(self.target_ca_bundle)
             if not path.is_absolute():

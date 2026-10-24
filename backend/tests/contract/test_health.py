@@ -3,8 +3,12 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 from fastapi.exceptions import RequestValidationError
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic import SecretStr
 
+import sentinel.api.app as api_app
 from sentinel.api.app import create_app
 from sentinel.api.problems import validation_problem
 from sentinel.config import Settings
@@ -101,3 +105,34 @@ async def test_non_ascii_authentication_header_is_rejected_cleanly() -> None:
         response = await client.get("/openapi.json", headers={b"Authorization": b"Bearer \xff"})
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_required"
+
+
+async def test_api_request_span_contains_only_safe_route_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(api_app, "provider", lambda *_: provider)
+
+    async def ready() -> bool:
+        return True
+
+    app = create_app(Settings(), database_probe=ready, tempo_probe=ready)
+
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://testserver"
+        ) as client,
+    ):
+        response = await client.get("/health/live")
+
+    assert response.status_code == 200
+    spans = exporter.get_finished_spans()
+    request_span = next(span for span in spans if span.name == "sentinel.api.request")
+    assert request_span.attributes == {
+        "http.request.method": "GET",
+        "http.route": "/health/live",
+        "http.response.status_code": 200,
+    }

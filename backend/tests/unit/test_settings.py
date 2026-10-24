@@ -41,3 +41,28 @@ def test_target_ca_bundle_requires_absolute_valid_pem(tmp_path: Path) -> None:
 def test_target_ca_bundle_path_is_not_in_settings_repr() -> None:
     settings = Settings(target_ca_bundle=None)
     assert "target_ca_bundle" not in repr(settings)
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "http://tempo.example.test/traces/{trace_id}/{trace_id}",
+        "http://user:password@tempo.example.test/traces/{trace_id}",
+        "http://tempo.example.test/traces/{trace_id}?token=secret",
+        "ftp://tempo.example.test/traces/{trace_id}",
+        "tempo.example.test/traces/{trace_id}",
+    ],
+)
+def test_tempo_trace_url_template_rejects_unsafe_shapes(template: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(tempo_trace_url_template=template)
+
+
+def test_tempo_trace_url_template_is_optional_and_exactly_one_placeholder() -> None:
+    assert Settings().tempo_trace_url_template is None
+    assert (
+        Settings(
+            tempo_trace_url_template="https://grafana.example.test/traces/{trace_id}"
+        ).tempo_trace_url_template
+        == "https://grafana.example.test/traces/{trace_id}"
+    )

@@ -133,7 +133,15 @@ class Worker:
                 work.result()
 
     async def run_once(self) -> bool:
-        lease = await joined_to_thread(self.service.claim, self.owner)
+        with self.tracer.start_as_current_span(
+            "sentinel.job.claim",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as claim_span:
+            lease = await joined_to_thread(self.service.claim, self.owner)
+            if lease is not None:
+                claim_span.set_attribute("sentinel.job.kind", lease.kind)
+                claim_span.set_attribute("sentinel.job.delivery", lease.delivery_count)
         if lease is None:
             return False
         event("job_claimed", job_id=lease.job_id)
@@ -154,11 +162,11 @@ class Worker:
         heartbeat_won = False
         try:
             with self.tracer.start_as_current_span(
-                "worker.handle",
+                "sentinel.job.handle",
                 record_exception=False,
                 set_status_on_exception=False,
                 attributes={
-                    "sentinel.job.id": str(lease.job_id),
+                    "sentinel.job.kind": lease.kind,
                     "sentinel.job.delivery": lease.delivery_count,
                 },
             ):

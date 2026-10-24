@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sentinel.execution.attempts import TraceReferenceRecord
 from sentinel.persistence.models import (
     ExecutionItemRow,
     ExecutionRow,
@@ -61,6 +62,50 @@ def validate_evidence(evidence: dict[str, object] | None) -> dict[str, object] |
 
 class TraceReferenceRepository:
     """All methods use the caller's transaction and are safe to retry."""
+
+    @staticmethod
+    def read_for_attempt(
+        session: Session,
+        *,
+        attempt_id: UUID,
+        execution_id: UUID,
+        execution_item_id: UUID,
+        project_id: UUID,
+    ) -> tuple[TraceReferenceRecord, ...]:
+        """Read only references in the caller's already-authorized execution scope."""
+        rows = session.scalars(
+            select(TraceReferenceRow)
+            .where(
+                TraceReferenceRow.id.is_not(None),
+                TraceReferenceRow.attempt_id == attempt_id,
+                TraceReferenceRow.execution_id == execution_id,
+                TraceReferenceRow.execution_item_id == execution_item_id,
+                TraceReferenceRow.project_id == project_id,
+            )
+            .order_by(
+                (TraceReferenceRow.relation == TraceRelation.PRIMARY).desc(),
+                TraceReferenceRow.trace_id,
+                TraceReferenceRow.id,
+            )
+            .limit(18)
+        )
+        return tuple(
+            TraceReferenceRecord(
+                id=row.id,
+                relation=row.relation,
+                trace_id=row.trace_id,
+                span_id=row.span_id,
+                correlation_source=row.correlation_source,
+                status=row.status,
+                first_checked_at=row.first_checked_at,
+                last_checked_at=row.last_checked_at,
+                deadline_at=row.deadline_at,
+                lookup_attempt_count=row.lookup_attempt_count,
+                last_error_code=row.last_error_code,
+                evidence_json=row.evidence_json,
+            )
+            for row in rows
+        )
 
     @staticmethod
     def create_primary(

@@ -6,6 +6,9 @@ from uuid import UUID, uuid4
 import pytest
 from alembic.command import downgrade, upgrade
 from alembic.config import Config
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy import select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DatabaseError, IntegrityError
@@ -26,6 +29,7 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
+    TraceReferenceRow,
 )
 from sentinel.persistence.regression import (
     BaselineComparisonInput,
@@ -467,6 +471,74 @@ def test_m4_result_read_projection_is_ordered_and_bounded(engine: Engine) -> Non
     assert record.comparison.state == "not_requested"
     assert [evaluation.ordinal for evaluation in record.evaluations] == [0]
     assert record.evaluations[0].evidence_omitted is False
+
+
+def test_m5_attempt_read_returns_scoped_ordered_bounded_trace_references(
+    engine: Engine,
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    exporter = InMemorySpanExporter()
+    tracer_provider = TracerProvider()
+    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    ids = _seed_scope(factory, seed=76200000)
+    with factory.begin() as session:
+        session.add(
+            TraceReferenceRow(
+                id=UUID("76200000-0000-4000-8000-000000000010"),
+                attempt_id=ids["attempt"],
+                execution_item_id=ids["item"],
+                execution_id=ids["execution"],
+                project_id=ids["project"],
+                relation="primary",
+                trace_id="f" * 32,
+                span_id="e" * 16,
+                correlation_source="sentinel_context",
+                status="pending",
+                deadline_at=NOW,
+                lookup_attempt_count=0,
+                evidence_schema_version=1,
+                created_at=NOW,
+                updated_at=NOW,
+            )
+        )
+        session.add_all(
+            [
+                TraceReferenceRow(
+                    id=UUID(f"76200000-0000-4000-8000-{index + 16:012x}"),
+                    attempt_id=ids["attempt"],
+                    execution_item_id=ids["item"],
+                    execution_id=ids["execution"],
+                    project_id=ids["project"],
+                    relation="linked",
+                    trace_id=f"{index:032x}",
+                    span_id=None,
+                    correlation_source="baggage_attribute_search",
+                    status="available",
+                    deadline_at=NOW,
+                    lookup_attempt_count=1,
+                    evidence_schema_version=1,
+                    created_at=NOW,
+                    updated_at=NOW,
+                )
+                for index in range(1, 18)
+            ]
+        )
+
+    record = PostgresExecutionService(
+        factory, clock=lambda: NOW, tracer=tracer_provider.get_tracer("sentinel.test")
+    ).get_attempt(ids["attempt"])
+
+    assert record is not None
+    assert record.attempt.primary_trace_id == "d" * 32
+    assert len(record.trace_references) == 17
+    assert record.trace_references_truncated is True
+    assert record.trace_references[0].relation == "primary"
+    assert [reference.trace_id for reference in record.trace_references[1:]] == [
+        f"{index:032x}" for index in range(1, 17)
+    ]
+    spans = exporter.get_finished_spans()
+    assert [span.name for span in spans] == ["sentinel.db.operation"]
+    assert spans[0].attributes == {"sentinel.operation.kind": "attempt.read"}
 
 
 def test_m4_execution_detail_reads_change_evidence_without_raw_values(engine: Engine) -> None:

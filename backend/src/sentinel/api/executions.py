@@ -15,6 +15,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationError,
     field_serializer,
     field_validator,
     model_validator,
@@ -23,7 +24,7 @@ from pydantic.json_schema import SkipJsonSchema
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from sentinel.api.problems import Problem, field_problem, problem
-from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
+from sentinel.execution.attempts import AttemptRecord, ResponseArtifact, TraceReferenceRecord
 from sentinel.execution.creation import (
     AttemptReadRecord,
     ExecutionCreateCommand,
@@ -156,6 +157,9 @@ class TimestampModel(BaseModel):
         "response_recorded_at",
         "recorded_at",
         "expires_at",
+        "first_checked_at",
+        "last_checked_at",
+        "deadline_at",
         when_used="unless-none",
         check_fields=False,
     )
@@ -276,6 +280,102 @@ class AttemptSummary(TimestampModel):
     links: RelativeLinks
 
 
+def _safe_evidence_text(value: str) -> str:
+    if (
+        not value
+        or len(value.encode("utf-8")) > 128
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+    ):
+        raise ValueError("invalid trace evidence text")
+    return value
+
+
+class TraceServiceEvidenceOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=128)
+    version: str | None = Field(default=None, max_length=128)
+    environment: str | None = Field(default=None, max_length=128)
+    revision: str | None = Field(default=None, max_length=128)
+
+    _validate_text = field_validator("name", "version", "environment", "revision")(
+        _safe_evidence_text
+    )
+
+
+class TraceDeploymentEvidenceOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str = Field(min_length=1, max_length=128)
+    environment: str | None = Field(default=None, max_length=128)
+    revision: str | None = Field(default=None, max_length=128)
+
+    _validate_text = field_validator("service", "environment", "revision")(_safe_evidence_text)
+
+
+class ComparisonAnchorChangeOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=128)
+    fields: list[Literal["name", "version", "environment", "revision"]] = Field(
+        min_length=1, max_length=4
+    )
+
+    _validate_name = field_validator("name")(_safe_evidence_text)
+
+
+class ComparisonAnchorOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_id: UUID
+    changed: list[ComparisonAnchorChangeOutput] = Field(max_length=32)
+
+
+class TraceEvidenceOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    primary_span_found: bool
+    trace_span_count: int = Field(ge=0, le=256)
+    error_span_count: int = Field(ge=0, le=256)
+    services: list[TraceServiceEvidenceOutput] = Field(max_length=32)
+    deployments: list[TraceDeploymentEvidenceOutput] = Field(max_length=32)
+    linked_match_count: int = Field(ge=0, le=16)
+    context_continuity: Literal["connected", "broken", "unknown"]
+    comparison_anchor: ComparisonAnchorOutput | None
+
+
+class TraceReferenceOutput(TimestampModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    relation: Literal["primary", "linked"]
+    trace_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    span_id: str | None = Field(pattern=r"^[0-9a-f]{16}$")
+    correlation_source: Literal["sentinel_context", "baggage_attribute_search"]
+    status: Literal["pending", "missing", "available", "partial", "tempo_unavailable", "expired"]
+    first_checked_at: datetime | None
+    last_checked_at: datetime | None
+    deadline_at: datetime | None
+    lookup_attempt_count: int = Field(ge=0, le=7)
+    last_error_code: (
+        Literal[
+            "not_found",
+            "unavailable",
+            "timeout",
+            "bad_response",
+            "oversized_response",
+            "unsupported",
+            "transport_error",
+            "invalid_trace",
+            "correlation_delivery_exhausted",
+        ]
+        | None
+    )
+    evidence: TraceEvidenceOutput | None
+    tempo_url: str | None = Field(max_length=2048, pattern=r"^https?://")
+
+
 class ResponseHeader(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -392,6 +492,8 @@ class AttemptDetail(AttemptSummary):
     evaluations: list[EvaluationOutput] = Field(max_length=257)
     evaluation_error_code: Literal["platform_evaluation_failure"] | None
     baseline_promotion: BaselinePromotionOutput
+    trace_references: list[TraceReferenceOutput] = Field(max_length=17)
+    trace_references_truncated: bool
 
 
 class ExecutionItem(TimestampModel):
@@ -681,12 +783,69 @@ def _response_observation(
     )
 
 
-def _attempt_detail(record: AttemptReadRecord) -> AttemptDetail:
+def _trace_reference_output(
+    record: TraceReferenceRecord, *, tempo_trace_url_template: str | None
+) -> TraceReferenceOutput | None:
+    try:
+        evidence = (
+            TraceEvidenceOutput.model_validate(record.evidence_json)
+            if record.evidence_json is not None
+            else None
+        )
+    except ValidationError:
+        evidence = None
+    try:
+        return TraceReferenceOutput(
+            id=record.id,
+            relation=cast(Literal["primary", "linked"], record.relation),
+            trace_id=record.trace_id,
+            span_id=record.span_id,
+            correlation_source=cast(
+                Literal["sentinel_context", "baggage_attribute_search"], record.correlation_source
+            ),
+            status=cast(
+                Literal[
+                    "pending",
+                    "missing",
+                    "available",
+                    "partial",
+                    "tempo_unavailable",
+                    "expired",
+                ],
+                record.status,
+            ),
+            first_checked_at=record.first_checked_at,
+            last_checked_at=record.last_checked_at,
+            deadline_at=record.deadline_at,
+            lookup_attempt_count=record.lookup_attempt_count,
+            last_error_code=cast(Any, record.last_error_code),
+            evidence=evidence,
+            tempo_url=(
+                tempo_trace_url_template.replace("{trace_id}", record.trace_id)
+                if tempo_trace_url_template is not None
+                else None
+            ),
+        )
+    except ValidationError:
+        return None
+
+
+def _attempt_detail(
+    record: AttemptReadRecord, *, tempo_trace_url_template: str | None = None
+) -> AttemptDetail:
     observation, observation_state = _response_observation(record.artifact, now=record.read_at)
     attempt = record.attempt
     if record.artifact is None and attempt.response_recorded_at is not None:
         observation_state = ObservationState.OMITTED
     summary = _attempt_summary(attempt)
+    trace_references = sorted(
+        getattr(record, "trace_references", ()),
+        key=lambda reference: (
+            reference.relation != "primary",
+            reference.trace_id,
+            str(reference.id),
+        ),
+    )
     return AttemptDetail(
         **summary.model_dump(),
         execution_id=record.execution_id,
@@ -701,6 +860,19 @@ def _attempt_detail(record: AttemptReadRecord) -> AttemptDetail:
             record.attempt.evaluation_error_code,
         ),
         baseline_promotion=_promotion_output(getattr(record, "promotion", None)),
+        trace_references=[
+            output
+            for reference in trace_references[:17]
+            if (
+                output := _trace_reference_output(
+                    reference, tempo_trace_url_template=tempo_trace_url_template
+                )
+            )
+            is not None
+        ],
+        trace_references_truncated=(
+            getattr(record, "trace_references_truncated", False) or len(trace_references) > 17
+        ),
     )
 
 
@@ -949,7 +1121,9 @@ def execution_router(service: PostgresExecutionService) -> APIRouter:
     return router
 
 
-def attempt_router(service: PostgresExecutionService) -> APIRouter:
+def attempt_router(
+    service: PostgresExecutionService, *, tempo_trace_url_template: str | None = None
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/attempts", tags=["attempts"])
 
     @router.get(
@@ -974,6 +1148,6 @@ def attempt_router(service: PostgresExecutionService) -> APIRouter:
         record = service.get_attempt(parsed)
         if record is None:
             return problem(404, "resource_not_found", "Request failed")
-        return _attempt_detail(record)
+        return _attempt_detail(record, tempo_trace_url_template=tempo_trace_url_template)
 
     return router
