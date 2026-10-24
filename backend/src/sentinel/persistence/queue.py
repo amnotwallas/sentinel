@@ -17,7 +17,7 @@ from sentinel.execution.domain import (
     validate_transition,
 )
 from sentinel.execution.ports import IdFactory
-from sentinel.persistence.models import ExecutionRow, JobRow
+from sentinel.persistence.models import ExecutionItemRow, ExecutionRow, JobRow, TestAttemptRow
 
 
 class PostgresJobStore:
@@ -190,10 +190,71 @@ class PostgresJobStore:
         row.finished_at = now
         self._clear_lease(row)
         execution = self._subject(session, row)
+        if self._fail_pending_evaluation(session, execution, now):
+            return
         if execution.status in {"queued", "running"}:
             execution.status = "failed"
             execution.verdict = "not_evaluated"
             execution.finished_at = now
+
+    @staticmethod
+    def _fail_pending_evaluation(session: Session, execution: ExecutionRow, now: datetime) -> bool:
+        if execution.result_contract_version != 1:
+            return False
+        items = list(
+            session.scalars(
+                select(ExecutionItemRow)
+                .where(ExecutionItemRow.execution_id == execution.id)
+                .order_by(ExecutionItemRow.ordinal)
+                .with_for_update()
+            )
+        )
+        attempts = list(
+            session.scalars(
+                select(TestAttemptRow)
+                .join(ExecutionItemRow, TestAttemptRow.execution_item_id == ExecutionItemRow.id)
+                .where(ExecutionItemRow.execution_id == execution.id)
+                .order_by(TestAttemptRow.sequence.desc())
+                .with_for_update()
+            )
+        )
+        latest: dict[UUID, TestAttemptRow] = {}
+        for attempt in attempts:
+            latest.setdefault(attempt.execution_item_id, attempt)
+        pending: ExecutionItemRow | None = None
+        pending_attempt: TestAttemptRow | None = None
+        for item in items:
+            candidate = latest.get(item.id)
+            if (
+                item.status == "running"
+                and candidate is not None
+                and candidate.result_contract_version == 1
+                and candidate.state == "response_received"
+            ):
+                pending = item
+                pending_attempt = candidate
+                break
+        if pending is None or pending_attempt is None:
+            return False
+        pending_attempt.state = "failed"
+        pending_attempt.verdict = "inconclusive"
+        pending_attempt.evaluation_error_code = "platform_evaluation_failure"
+        pending_attempt.finished_at = now
+        pending_attempt.duration_ms = max(
+            0, int((now - pending_attempt.created_at).total_seconds() * 1000)
+        )
+        pending.status = "failed"
+        pending.verdict = "inconclusive"
+        pending.finished_at = now
+        for item in items:
+            if item.ordinal > pending.ordinal and item.status == "pending":
+                item.status = "skipped"
+                item.verdict = "not_evaluated"
+                item.finished_at = now
+        execution.status = "failed"
+        execution.verdict = "inconclusive"
+        execution.finished_at = now
+        return True
 
     @staticmethod
     def _clear_lease(row: JobRow) -> None:

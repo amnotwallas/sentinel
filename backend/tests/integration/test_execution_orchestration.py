@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,6 +13,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy import func, select, text, update
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from sentinel.catalog.definitions import DefinitionValidationError
@@ -29,8 +31,12 @@ from sentinel.execution.ports import CancellationSignal, TransportResult
 from sentinel.execution.preparation import PreparedRequest
 from sentinel.persistence.attempts import PostgresAttemptStore
 from sentinel.persistence.models import (
+    BaselineActivationRow,
+    BaselineComparisonRow,
+    BaselineRow,
     EnvironmentRevisionRow,
     EnvironmentRow,
+    EvaluationRow,
     ExecutionItemRow,
     ExecutionRow,
     JobRow,
@@ -45,6 +51,7 @@ from sentinel.persistence.models import (
 )
 from sentinel.persistence.orchestration import OrchestrationConflict, PostgresOrchestrationStore
 from sentinel.persistence.queue import PostgresJobStore
+from sentinel.security.definition_policy import validate_test_definition
 from sentinel.security.secrets import EnvironmentSecretResolver
 from sentinel.telemetry.execution import OpenTelemetryTraceLifecycle
 from tests.conftest import Clock
@@ -279,11 +286,11 @@ def test_ordered_suite_reaches_atomic_terminal_state(
         )
     assert execution is not None and (execution.status, execution.verdict) == (
         "completed",
-        "not_evaluated",
+        "passed",
     )
     assert [(item.ordinal, item.status, item.verdict) for item in items] == [
-        (0, "completed", "not_evaluated"),
-        (1, "completed", "not_evaluated"),
+        (0, "completed", "passed"),
+        (1, "completed", "passed"),
     ]
     assert job is not None and job.state == "succeeded"
     finished = exporter.get_finished_spans()
@@ -294,6 +301,239 @@ def test_ordered_suite_reaches_atomic_terminal_state(
     assert [attempt.client_span_id for attempt in attempts] == [
         f"{span.context.span_id:016x}" for span in finished
     ]
+
+
+def test_version1_response_is_evaluated_and_aggregated(
+    engine: Engine, seeded_orchestration_catalog: None
+) -> None:
+    execution_id, jobs = create_execution(engine)
+    lease = jobs.claim(uuid4(), 60)
+    assert lease is not None
+    transport = ScriptedTransport(iter([response({"ok": True})]))
+
+    ExecutionOrchestrator(
+        PostgresOrchestrationStore(sessionmaker(engine, expire_on_commit=False), clock=lambda: NOW),
+        transport,
+        EnvironmentSecretResolver({}),
+        telemetry(),
+        clock=lambda: NOW,
+    ).run(lease)
+
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, execution_id)
+        item = session.scalar(
+            select(ExecutionItemRow).where(ExecutionItemRow.execution_id == execution_id)
+        )
+        attempt = (
+            session.scalar(
+                select(TestAttemptRow).where(TestAttemptRow.execution_item_id == item.id)
+            )
+            if item is not None
+            else None
+        )
+        comparison_count = session.scalar(
+            select(func.count(BaselineComparisonRow.attempt_id)).where(
+                BaselineComparisonRow.attempt_id == attempt.id
+                if attempt is not None
+                else text("false")
+            )
+        )
+        evaluation_count = session.scalar(
+            select(func.count(EvaluationRow.id)).where(
+                EvaluationRow.attempt_id == attempt.id if attempt is not None else text("false")
+            )
+        )
+
+    assert execution is not None and (execution.status, execution.verdict) == (
+        "completed",
+        "passed",
+    )
+    assert item is not None and (item.status, item.verdict) == ("completed", "passed")
+    assert attempt is not None and (attempt.state, attempt.verdict) == ("evaluated", "passed")
+    assert comparison_count == 1
+    assert evaluation_count == 0
+
+
+def test_required_failure_precedes_advisory_failure_in_durable_aggregation(
+    engine: Engine, seeded_orchestration_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory.begin() as session:
+        session.execute(
+            update(TestCaseRevisionRow)
+            .where(TestCaseRevisionRow.id == CASE_ONE_REVISION_ID)
+            .values(
+                definition=definition(
+                    assertions=[
+                        {
+                            "id": "00000000-0000-4000-8000-000000000101",
+                            "severity": "required",
+                            "kind": "status_code",
+                            "expected_codes": [201],
+                        },
+                        {
+                            "id": "00000000-0000-4000-8000-000000000102",
+                            "severity": "advisory",
+                            "kind": "header_equals",
+                            "header_name": "X-Change",
+                            "expected": "new",
+                        },
+                    ]
+                )
+            )
+        )
+    execution_id, jobs = create_execution(engine)
+    lease = jobs.claim(uuid4(), 60)
+    assert lease is not None
+    transport = ScriptedTransport(
+        iter(
+            [
+                TransportResult(
+                    TransportOutcome.RESPONSE_RECEIVED,
+                    DispatchCertainty.RESPONSE_RECEIVED,
+                    500,
+                    {"x-change": "old"},
+                    b"",
+                    0,
+                    False,
+                )
+            ]
+        )
+    )
+
+    ExecutionOrchestrator(
+        PostgresOrchestrationStore(factory, clock=lambda: NOW),
+        transport,
+        EnvironmentSecretResolver({}),
+        telemetry(),
+        clock=lambda: NOW,
+    ).run(lease)
+
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, execution_id)
+        item = session.scalar(
+            select(ExecutionItemRow).where(ExecutionItemRow.execution_id == execution_id)
+        )
+        attempt = (
+            session.scalar(
+                select(TestAttemptRow).where(TestAttemptRow.execution_item_id == item.id)
+            )
+            if item is not None
+            else None
+        )
+        evaluations = list(
+            session.scalars(
+                select(EvaluationRow)
+                .where(
+                    EvaluationRow.attempt_id == attempt.id if attempt is not None else text("false")
+                )
+                .order_by(EvaluationRow.ordinal)
+            )
+        )
+    assert execution is not None and execution.verdict == "functional_regression"
+    assert item is not None and item.verdict == "functional_regression"
+    assert attempt is not None and attempt.verdict == "functional_regression"
+    assert [(row.ordinal, row.severity, row.outcome) for row in evaluations] == [
+        (0, "required", "failed"),
+        (1, "advisory", "failed"),
+    ]
+
+
+def test_pinned_baseline_is_used_for_evaluation_and_recorded(
+    engine: Engine, seeded_orchestration_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    rule_id = "00000000-0000-4000-8000-000000000103"
+    document = definition(
+        comparison_policy={
+            "selectors": [
+                {
+                    "id": rule_id,
+                    "severity": "required",
+                    "pointer": "/value",
+                    "normalizer": {"name": "none", "version": 1},
+                }
+            ]
+        }
+    )
+    fingerprint = validate_test_definition(document).policy_fingerprint
+    baseline_id = UUID("50000000-0000-4000-8000-000000000104")
+    activation_id = UUID("50000000-0000-4000-8000-000000000105")
+    with factory.begin() as session:
+        session.execute(
+            update(TestCaseRevisionRow)
+            .where(TestCaseRevisionRow.id == CASE_ONE_REVISION_ID)
+            .values(definition=document, policy_fingerprint=fingerprint)
+        )
+        session.flush()
+        session.add(
+            BaselineRow(
+                id=baseline_id,
+                test_case_id=CASE_ONE_ID,
+                environment_id=ENVIRONMENT_ID,
+                project_id=PROJECT_ID,
+                version=1,
+                source_attempt_id=uuid4(),
+                source_execution_id=uuid4(),
+                source_test_case_revision_id=CASE_ONE_REVISION_ID,
+                source_attempt_verdict="baseline_required",
+                source_finished_at=NOW,
+                policy_fingerprint=fingerprint,
+                selected_values_schema_version=1,
+                selected_values={
+                    "schema_version": 1,
+                    "values": [{"rule_id": rule_id, "value": Decimal("1.00")}],
+                },
+                created_at=NOW,
+            )
+        )
+        session.flush()
+        session.add(
+            BaselineActivationRow(
+                id=activation_id,
+                test_case_id=CASE_ONE_ID,
+                environment_id=ENVIRONMENT_ID,
+                project_id=PROJECT_ID,
+                baseline_id=baseline_id,
+                activated_at=NOW,
+            )
+        )
+
+    execution_id, jobs = create_execution(engine)
+    lease = jobs.claim(uuid4(), 60)
+    assert lease is not None
+    transport = ScriptedTransport(iter([response({"value": Decimal("1.00")})]))
+    ExecutionOrchestrator(
+        PostgresOrchestrationStore(factory, clock=lambda: NOW),
+        transport,
+        EnvironmentSecretResolver({}),
+        telemetry(),
+        clock=lambda: NOW,
+    ).run(lease)
+
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, execution_id)
+        item = session.scalar(
+            select(ExecutionItemRow).where(ExecutionItemRow.execution_id == execution_id)
+        )
+        attempt = (
+            session.scalar(
+                select(TestAttemptRow).where(TestAttemptRow.execution_item_id == item.id)
+            )
+            if item is not None
+            else None
+        )
+        comparison = session.get(BaselineComparisonRow, attempt.id) if attempt is not None else None
+    assert execution is not None and execution.verdict == "passed"
+    assert item is not None and item.baseline_activation_id == activation_id
+    assert item.baseline_id == baseline_id
+    assert attempt is not None and attempt.verdict == "passed"
+    assert comparison is not None and (
+        comparison.state,
+        comparison.baseline_id,
+        comparison.baseline_version,
+        comparison.policy_fingerprint,
+    ) == ("compatible", baseline_id, 1, fingerprint)
 
 
 def test_preparation_failure_continues_to_next_ordered_item(
@@ -352,7 +592,7 @@ def test_preparation_failure_continues_to_next_ordered_item(
         )
     assert [(item.status, item.verdict) for item in items] == [
         ("failed", "not_evaluated"),
-        ("completed", "not_evaluated"),
+        ("completed", "passed"),
     ]
 
 
@@ -387,7 +627,7 @@ def test_crash_before_dispatch_resumes_same_prepared_attempt(
             )
         )
     assert len(attempts) == 1 and attempts[0].id == prepared.attempt.id
-    assert attempts[0].state == "response_received"
+    assert attempts[0].state == "evaluated"
     assert len(transport.requests) == 1
 
 
@@ -510,6 +750,92 @@ def test_response_checkpoint_recovery_never_redispatches(
     assert job is not None and job.state == "succeeded"
 
 
+def test_delivery_exhaustion_fails_pending_v1_evaluation_atomically(
+    engine: Engine, seeded_orchestration_catalog: None, clock: Clock
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    execution = PostgresExecutionService(factory, clock=clock).create(
+        ExecutionCreateCommand(ENVIRONMENT_ID, test_case_id=CASE_ONE_ID)
+    )
+    jobs = PostgresJobStore(factory, clock=clock)
+    with factory.begin() as session:
+        session.execute(
+            update(JobRow).where(JobRow.subject_id == execution.id).values(max_deliveries=1)
+        )
+    first_lease = jobs.claim(uuid4(), 60)
+    assert first_lease is not None
+    orchestration = PostgresOrchestrationStore(factory, clock=clock)
+    work = orchestration.acquire_next(first_lease, attempt_id=uuid4())
+    assert work is not None
+    attempts = PostgresAttemptStore(factory, clock=clock)
+    attempts.checkpoint_dispatch(
+        work.attempt.id,
+        first_lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    attempts.record_response(
+        work.attempt.id,
+        first_lease,
+        ResponseArtifact(
+            work.attempt.id,
+            200,
+            {},
+            "json",
+            {"ok": True},
+            11,
+            False,
+            False,
+            clock.value,
+            clock.value + timedelta(days=7),
+        ),
+        outcome=TransportOutcome.RESPONSE_RECEIVED,
+    )
+
+    clock.advance(60)
+    assert jobs.claim(uuid4(), 60) is None
+
+    with Session(engine) as session:
+        execution_row = session.get(ExecutionRow, execution.id)
+        item = session.scalar(
+            select(ExecutionItemRow).where(ExecutionItemRow.execution_id == execution.id)
+        )
+        attempt = (
+            session.scalar(
+                select(TestAttemptRow).where(TestAttemptRow.execution_item_id == item.id)
+            )
+            if item is not None
+            else None
+        )
+        job = session.scalar(select(JobRow).where(JobRow.subject_id == execution.id))
+        comparison_count = session.scalar(
+            select(func.count(BaselineComparisonRow.attempt_id)).where(
+                BaselineComparisonRow.attempt_id == attempt.id
+                if attempt is not None
+                else text("false")
+            )
+        )
+        evaluation_count = session.scalar(
+            select(func.count(EvaluationRow.id)).where(
+                EvaluationRow.attempt_id == attempt.id if attempt is not None else text("false")
+            )
+        )
+    assert execution_row is not None and (execution_row.status, execution_row.verdict) == (
+        "failed",
+        "inconclusive",
+    )
+    assert item is not None and (item.status, item.verdict) == ("failed", "inconclusive")
+    assert attempt is not None and (
+        attempt.state,
+        attempt.verdict,
+        attempt.evaluation_error_code,
+    ) == ("failed", "inconclusive", "platform_evaluation_failure")
+    assert job is not None and job.state == "dead"
+    assert comparison_count == 0
+    assert evaluation_count == 0
+
+
 def test_transport_failure_checkpoint_recovery_never_redispatches(
     engine: Engine, seeded_orchestration_catalog: None, clock: Clock
 ) -> None:
@@ -587,7 +913,7 @@ def test_safe_recovery_creates_one_fresh_linked_successor(
     assert recovered is not None
     successor_id = UUID("60000000-0000-4000-8000-000000000001")
     transport = ScriptedTransport(iter([response("recovered", kind="text")]))
-    ids = iter([uuid4(), successor_id, uuid4()])
+    ids = iter([uuid4(), successor_id, uuid4(), uuid4()])
 
     ExecutionOrchestrator(
         store,
@@ -609,7 +935,7 @@ def test_safe_recovery_creates_one_fresh_linked_successor(
         )
     assert [(item.id, item.state, item.replay_successor_id) for item in attempts] == [
         (first.attempt.id, "replay_scheduled", successor_id),
-        (successor_id, "response_received", None),
+        (successor_id, "evaluated", None),
     ]
     assert attempts[0].primary_trace_id != attempts[1].primary_trace_id
     assert attempts[0].client_span_id != attempts[1].client_span_id
@@ -668,7 +994,7 @@ def test_acknowledged_unsafe_recovery_creates_fresh_successor(
                 .order_by(TestAttemptRow.sequence)
             )
         )
-    assert [attempt.state for attempt in attempts] == ["replay_scheduled", "response_received"]
+    assert [attempt.state for attempt in attempts] == ["replay_scheduled", "evaluated"]
     assert attempts[0].replay_successor_id == attempts[1].id
     assert attempts[0].primary_trace_id != attempts[1].primary_trace_id
     assert attempts[0].client_span_id != attempts[1].client_span_id
@@ -921,6 +1247,177 @@ def test_concurrent_recovery_creates_exactly_one_successor(
             )
         )
     assert len(attempts) == 2
+
+
+def test_evaluation_persistence_rolls_back_before_any_child_or_state_write(
+    engine: Engine, seeded_orchestration_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory.begin() as session:
+        session.execute(
+            update(TestCaseRevisionRow)
+            .where(TestCaseRevisionRow.id == CASE_ONE_REVISION_ID)
+            .values(
+                definition=definition(
+                    assertions=[
+                        {
+                            "id": "00000000-0000-4000-8000-000000000106",
+                            "severity": "required",
+                            "kind": "status_code",
+                            "expected_codes": [200],
+                        },
+                        {
+                            "id": "00000000-0000-4000-8000-000000000107",
+                            "severity": "required",
+                            "kind": "status_code",
+                            "expected_codes": [201],
+                        },
+                    ]
+                )
+            )
+        )
+    execution_id, jobs = create_execution(engine)
+    lease = jobs.claim(uuid4(), 60)
+    assert lease is not None
+    store = PostgresOrchestrationStore(factory, clock=lambda: NOW)
+    work = store.acquire_next(lease, attempt_id=uuid4())
+    assert work is not None
+    store.checkpoint_dispatch(
+        work.attempt.id,
+        lease,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    store.record_response(
+        work.attempt.id,
+        lease,
+        ResponseArtifact(
+            work.attempt.id,
+            200,
+            {},
+            "json",
+            {"ok": True},
+            11,
+            False,
+            False,
+            NOW,
+            NOW + timedelta(days=7),
+        ),
+        outcome=TransportOutcome.RESPONSE_RECEIVED,
+    )
+    awaiting = store.acquire_next(lease, attempt_id=uuid4())
+    assert awaiting is not None
+    result = ExecutionOrchestrator._evaluate(awaiting)
+    duplicate_id = uuid4()
+    with pytest.raises(IntegrityError):
+        store.persist_evaluation(
+            awaiting.attempt.id,
+            lease,
+            result,
+            evaluation_ids=(duplicate_id, duplicate_id),
+        )
+
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, execution_id)
+        item = session.scalar(
+            select(ExecutionItemRow).where(ExecutionItemRow.execution_id == execution_id)
+        )
+        attempt = (
+            session.scalar(
+                select(TestAttemptRow).where(TestAttemptRow.execution_item_id == item.id)
+            )
+            if item is not None
+            else None
+        )
+        assert attempt is not None
+        assert (
+            session.scalar(
+                select(func.count(BaselineComparisonRow.attempt_id)).where(
+                    BaselineComparisonRow.attempt_id == attempt.id
+                )
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count(EvaluationRow.id)).where(EvaluationRow.attempt_id == attempt.id)
+            )
+            == 0
+        )
+    assert execution is not None and execution.status == "running"
+    assert item is not None and item.status == "running"
+    assert attempt is not None and attempt.state == "response_received"
+
+
+def test_stale_fence_rejects_evaluation_after_lease_replacement(
+    engine: Engine, seeded_orchestration_catalog: None, clock: Clock
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    execution = PostgresExecutionService(factory, clock=clock).create(
+        ExecutionCreateCommand(ENVIRONMENT_ID, test_case_id=CASE_ONE_ID)
+    )
+    jobs = PostgresJobStore(factory, clock=clock)
+    old = jobs.claim(uuid4(), 60)
+    assert old is not None
+    store = PostgresOrchestrationStore(factory, clock=clock)
+    work = store.acquire_next(old, attempt_id=uuid4())
+    assert work is not None
+    store.checkpoint_dispatch(
+        work.attempt.id,
+        old,
+        fingerprint="a" * 64,
+        trace_id="b" * 32,
+        span_id="c" * 16,
+    )
+    store.record_response(
+        work.attempt.id,
+        old,
+        ResponseArtifact(
+            work.attempt.id,
+            200,
+            {},
+            "json",
+            {"ok": True},
+            11,
+            False,
+            False,
+            clock.value,
+            clock.value + timedelta(days=7),
+        ),
+        outcome=TransportOutcome.RESPONSE_RECEIVED,
+    )
+    clock.advance(60)
+    replacement = jobs.claim(uuid4(), 60)
+    assert replacement is not None
+    recovered = store.acquire_next(replacement, attempt_id=uuid4())
+    assert recovered is not None
+    result = ExecutionOrchestrator._evaluate(recovered)
+
+    with pytest.raises(LeaseLost):
+        store.persist_evaluation(
+            recovered.attempt.id,
+            old,
+            result,
+            evaluation_ids=tuple(uuid4() for _ in result.evaluations),
+        )
+
+    with Session(engine) as session:
+        attempt = session.scalar(
+            select(TestAttemptRow)
+            .join(ExecutionItemRow)
+            .where(ExecutionItemRow.execution_id == execution.id)
+        )
+        assert attempt is not None
+        assert attempt.state == "response_received"
+        assert (
+            session.scalar(
+                select(func.count(BaselineComparisonRow.attempt_id)).where(
+                    BaselineComparisonRow.attempt_id == attempt.id
+                )
+            )
+            == 0
+        )
 
 
 def test_stale_fence_cannot_commit_after_reclaim(
@@ -1397,7 +1894,7 @@ def test_safe_method_recovery_replays_head_and_options_with_a_fresh_attempt(
         )
     assert [attempt.state for attempt in attempts] == [
         "replay_scheduled",
-        "response_received",
+        "evaluated",
     ]
     assert attempts[0].replay_successor_id == attempts[1].id
     assert attempts[0].primary_trace_id != attempts[1].primary_trace_id

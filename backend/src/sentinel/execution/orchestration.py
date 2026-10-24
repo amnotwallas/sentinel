@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID, uuid4
 
 from sentinel.catalog.definitions import DefinitionValidationError
@@ -22,10 +23,20 @@ from sentinel.execution.ports import (
     CancellableTransportAdapter,
     CancellationSignal,
     OrchestrationStore,
+    PinnedAttempt,
     TraceLifecycle,
     TransportResult,
 )
 from sentinel.execution.preparation import PreparationError, prepare_request, request_fingerprint
+from sentinel.regression.evaluator import (
+    EvaluationDefinition,
+    EvaluationInputError,
+    EvaluationObservation,
+    EvaluationResult,
+    RedactionPolicy,
+    evaluate,
+)
+from sentinel.regression.policy import ValidatedRegressionPolicy
 from sentinel.security.definition_policy import (
     validate_environment_document,
     validate_test_definition,
@@ -58,6 +69,7 @@ class ExecutionOrchestrator:
         traces: TraceLifecycle,
         *,
         attempt_ids: Callable[[], UUID] = uuid4,
+        evaluation_ids: Callable[[], UUID] = uuid4,
         clock: Callable[[], datetime] | None = None,
         artifact_retention: timedelta = timedelta(days=7),
     ) -> None:
@@ -66,6 +78,7 @@ class ExecutionOrchestrator:
         self.secrets_resolver = secrets_resolver
         self.traces = traces
         self.attempt_ids = attempt_ids
+        self.evaluation_ids = evaluation_ids
         self.clock = clock or (lambda: datetime.now(UTC))
         self.artifact_retention = artifact_retention
 
@@ -161,6 +174,25 @@ class ExecutionOrchestrator:
                 self.store.mark_indeterminate(work.attempt.id, lease)
                 return
 
+            if state == AttemptState.RESPONSE_RECEIVED and work.result_contract_version == 1:
+                try:
+                    evaluation_result = self._evaluate(work)
+                except (DefinitionValidationError, EvaluationInputError):
+                    self.store.fail_evaluation(work.attempt.id, lease)
+                    return
+                done = self.store.persist_evaluation(
+                    work.attempt.id,
+                    lease,
+                    evaluation_result,
+                    evaluation_ids=tuple(
+                        self.evaluation_ids() for _ in evaluation_result.evaluations
+                    ),
+                )
+                cancellation.raise_if_cancelled()
+                if done:
+                    return
+                continue
+
             if state in _TERMINAL_ATTEMPT_STATES:
                 cancellation.raise_if_cancelled()
                 if self.store.resume_terminal(work.attempt.id, lease):
@@ -170,6 +202,57 @@ class ExecutionOrchestrator:
             if state == AttemptState.REPLAY_SCHEDULED:
                 continue
             raise RuntimeError("unsupported_attempt_state")
+
+    @staticmethod
+    def _evaluate(work: PinnedAttempt) -> EvaluationResult:
+        if work.response_artifact is None or work.snapshot_at is None:
+            raise EvaluationInputError("response_snapshot_missing")
+        validated = validate_test_definition(work.test_definition)
+        document = validated.to_document()
+        comparison_policy = document.get("comparison_policy")
+        assertions = document.get("assertions")
+        redaction = document.get("redaction")
+        if not isinstance(comparison_policy, dict) or not isinstance(assertions, list):
+            raise EvaluationInputError("malformed_definition")
+        if not isinstance(redaction, dict):
+            raise EvaluationInputError("malformed_redaction")
+        policy = ValidatedRegressionPolicy(
+            assertions=assertions,
+            comparison_policy=comparison_policy,
+            policy_fingerprint=validated.policy_fingerprint,
+        )
+        redaction_pointers = redaction.get("json_pointers", [])
+        redaction_headers = redaction.get("header_names", [])
+        if not isinstance(redaction_pointers, list) or not isinstance(redaction_headers, list):
+            raise EvaluationInputError("malformed_redaction")
+        if any(not isinstance(value, str) for value in redaction_pointers + redaction_headers):
+            raise EvaluationInputError("malformed_redaction")
+        headers: list[tuple[str, str]] = []
+        for name, value in work.response_artifact.headers.items():
+            if not isinstance(name, str) or not isinstance(value, str):
+                raise EvaluationInputError("malformed_observation")
+            headers.append((name, value))
+        observation = EvaluationObservation(
+            status_code=work.response_artifact.status_code,
+            headers=tuple(headers),
+            body_kind=work.response_artifact.body_kind,
+            body_content=work.response_artifact.body_content,
+            truncated=work.response_artifact.truncated,
+            redaction_unavailable=work.response_artifact.redaction_unavailable,
+            expired=work.snapshot_at >= work.response_artifact.expires_at,
+        )
+        return evaluate(
+            EvaluationDefinition(
+                policy=policy,
+                redaction=RedactionPolicy(
+                    json_pointers=tuple(cast(str, value) for value in redaction_pointers),
+                    header_names=frozenset(cast(str, value) for value in redaction_headers),
+                ),
+            ),
+            observation,
+            baseline=work.baseline,
+            duration_ms=work.attempt.duration_ms,
+        )
 
     def _persist_result(self, attempt_id: UUID, lease: Lease, result: TransportResult) -> bool:
         if result.outcome in {

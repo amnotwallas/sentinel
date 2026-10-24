@@ -1,5 +1,6 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from sentinel.execution.domain import (
     TransportOutcome,
 )
 from sentinel.execution.preparation import PreparedRequest
+from sentinel.regression.evaluator import BaselineCandidate, EvaluationResult
 
 IdFactory = Callable[[], UUID]
 
@@ -71,6 +73,14 @@ class PinnedAttempt:
     environment_document: object
     test_definition: object
     unsafe_replay_acknowledged: bool
+    result_contract_version: int = 0
+    response_artifact: ResponseArtifact | None = None
+    baseline: BaselineCandidate | None = None
+    baseline_activation_id: UUID | None = None
+    baseline_id: UUID | None = None
+    baseline_version: int | None = None
+    baseline_policy_fingerprint: str | None = None
+    snapshot_at: datetime | None = None
 
 
 class TransportAdapter(Protocol):
@@ -210,6 +220,17 @@ class OrchestrationStore(Protocol):
         redirect_code: RedirectRejectionCode | None = None,
         artifact: ResponseArtifact | None = None,
     ) -> bool: ...
+
+    def persist_evaluation(
+        self,
+        attempt_id: UUID,
+        lease: Lease,
+        result: EvaluationResult,
+        *,
+        evaluation_ids: Sequence[UUID],
+    ) -> bool: ...
+
+    def fail_evaluation(self, attempt_id: UUID, lease: Lease) -> None: ...
 
     def schedule_replay(
         self, attempt_id: UUID, lease: Lease, *, successor_id: UUID

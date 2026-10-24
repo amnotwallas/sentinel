@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
@@ -19,6 +19,7 @@ from sentinel.execution.ports import (
     TransportResult,
 )
 from sentinel.execution.preparation import PreparedRequest
+from sentinel.regression.evaluator import EvaluationResult
 from sentinel.security.secrets import EnvironmentSecretResolver
 
 NOW = datetime(2030, 1, 1, tzinfo=UTC)
@@ -122,6 +123,22 @@ class FakeStore(OrchestrationStore):
         self.events.append(f"transport_failed:{kwargs.get('artifact') is not None}")
         self.done = True
         return True
+
+    def persist_evaluation(
+        self,
+        attempt_id: UUID,
+        lease: Lease,
+        result: EvaluationResult,
+        *,
+        evaluation_ids: Sequence[UUID],
+    ) -> bool:
+        self.events.append("evaluation")
+        self.done = True
+        return True
+
+    def fail_evaluation(self, attempt_id: UUID, lease: Lease) -> None:
+        self.events.append("evaluation_failed")
+        self.done = True
 
     def schedule_replay(
         self, attempt_id: UUID, lease: Lease, *, successor_id: UUID

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from typing import Literal, cast
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -16,6 +17,7 @@ from sentinel.execution.attempts import AttemptRecord, ResponseArtifact
 from sentinel.execution.domain import (
     AttemptState,
     DispatchCertainty,
+    ErrorCode,
     InfrastructureFailure,
     JobState,
     Lease,
@@ -27,6 +29,8 @@ from sentinel.execution.domain import (
 from sentinel.execution.ports import PinnedAttempt
 from sentinel.persistence.attempts import AttemptConflict, AttemptNotFound, PostgresAttemptStore
 from sentinel.persistence.models import (
+    BaselineActivationRow,
+    BaselineRow,
     EnvironmentRevisionRow,
     ExecutionItemRow,
     ExecutionRow,
@@ -34,6 +38,18 @@ from sentinel.persistence.models import (
     ResponseArtifactRow,
     TestAttemptRow,
     TestCaseRevisionRow,
+)
+from sentinel.persistence.regression import (
+    BaselineComparisonInput,
+    BoundedEvidence,
+    EvaluationInput,
+    PostgresEvaluationPersistence,
+)
+from sentinel.regression.evaluator import (
+    BaselineCandidate,
+    BaselineState,
+    EvaluationResult,
+    Verdict,
 )
 
 _TERMINAL_ITEM_STATES = frozenset({"completed", "indeterminate", "failed", "skipped"})
@@ -74,6 +90,15 @@ _ARTIFACT_FAILURE_OUTCOMES = frozenset(
         TransportOutcome.READ_TIMEOUT,
         TransportOutcome.READ_FAILURE,
     }
+)
+_VERDICT_PRECEDENCE = (
+    "inconclusive",
+    "baseline_required",
+    "functional_regression",
+    "performance_warning",
+    "observed_change",
+    "not_evaluated",
+    "passed",
 )
 
 
@@ -223,6 +248,63 @@ class PostgresOrchestrationStore:
             if environment is None or revision is None:
                 raise OrchestrationConflict("pinned revision missing")
             definition = copy.deepcopy(revision.definition)
+            artifact = None
+            if attempt.state == AttemptState.RESPONSE_RECEIVED:
+                artifact_row = session.get(ResponseArtifactRow, attempt.id)
+                if artifact_row is None:
+                    raise OrchestrationConflict("response artifact missing")
+                artifact = ResponseArtifact(
+                    attempt_id=artifact_row.attempt_id,
+                    status_code=artifact_row.status_code,
+                    headers=artifact_row.headers,
+                    body_kind=artifact_row.body_kind,
+                    body_content=artifact_row.body_content,
+                    source_bytes_captured=artifact_row.source_bytes_captured,
+                    truncated=artifact_row.truncated,
+                    redaction_unavailable=artifact_row.redaction_unavailable,
+                    recorded_at=artifact_row.recorded_at,
+                    expires_at=artifact_row.expires_at,
+                )
+            baseline = None
+            baseline_activation_id = item.baseline_activation_id
+            baseline_id = item.baseline_id
+            baseline_version = None
+            baseline_policy_fingerprint = None
+            if baseline_activation_id is not None and baseline_id is not None:
+                activation = session.scalar(
+                    select(BaselineActivationRow).where(
+                        BaselineActivationRow.id == baseline_activation_id,
+                        BaselineActivationRow.baseline_id == baseline_id,
+                        BaselineActivationRow.test_case_id == item.test_case_id,
+                        BaselineActivationRow.environment_id == execution.environment_id,
+                        BaselineActivationRow.project_id == item.project_id,
+                    )
+                )
+                baseline_row = session.scalar(
+                    select(BaselineRow).where(
+                        BaselineRow.id == baseline_id,
+                        BaselineRow.test_case_id == item.test_case_id,
+                        BaselineRow.environment_id == execution.environment_id,
+                        BaselineRow.project_id == item.project_id,
+                    )
+                )
+                if activation is None or baseline_row is None:
+                    raise OrchestrationConflict("pinned baseline missing")
+                selected_values = baseline_row.selected_values
+                raw_values = selected_values.get("values")
+                if not isinstance(raw_values, list):
+                    raise OrchestrationConflict("pinned baseline values malformed")
+                values: dict[str, object] = {}
+                for entry in raw_values:
+                    if not isinstance(entry, dict) or not isinstance(entry.get("rule_id"), str):
+                        raise OrchestrationConflict("pinned baseline values malformed")
+                    values[entry["rule_id"]] = entry.get("value")
+                baseline = BaselineCandidate(
+                    policy_fingerprint=baseline_row.policy_fingerprint,
+                    values=values,
+                )
+                baseline_version = baseline_row.version
+                baseline_policy_fingerprint = baseline_row.policy_fingerprint
             allow_unsafe = (
                 isinstance(definition, dict) and definition.get("allow_unsafe_replay") is True
             )
@@ -237,6 +319,14 @@ class PostgresOrchestrationStore:
                 copy.deepcopy(environment.definition),
                 definition,
                 acknowledged,
+                result_contract_version=attempt.result_contract_version,
+                response_artifact=artifact,
+                baseline=baseline,
+                baseline_activation_id=baseline_activation_id,
+                baseline_id=baseline_id,
+                baseline_version=baseline_version,
+                baseline_policy_fingerprint=baseline_policy_fingerprint,
+                snapshot_at=now,
             )
 
     def checkpoint_dispatch(
@@ -308,7 +398,8 @@ class PostgresOrchestrationStore:
             row.response_recorded_at = artifact.recorded_at
             row.finished_at = now
             row.duration_ms = self._duration(row, now)
-            self._finish_item(item, "completed", "not_evaluated", now)
+            if row.result_contract_version == 0:
+                self._finish_item(item, "completed", "not_evaluated", now)
             return self._aggregate(job, execution, items, now)
 
     def record_transport_failure(
@@ -352,6 +443,124 @@ class PostgresOrchestrationStore:
             else:
                 self._finish_item(item, "completed", "inconclusive", now)
             return self._aggregate(job, execution, items, now)
+
+    def persist_evaluation(
+        self,
+        attempt_id: UUID,
+        lease: Lease,
+        result: EvaluationResult,
+        *,
+        evaluation_ids: Sequence[UUID],
+    ) -> bool:
+        if len(evaluation_ids) != len(result.evaluations):
+            raise OrchestrationConflict("evaluation identity count mismatch")
+        with self._transaction() as session:
+            job, execution, items, now = self._lock_execution(session, lease)
+            self._require_running(execution)
+            item, row = self._lock_attempt(session, items, attempt_id)
+            if row.result_contract_version != 1:
+                raise OrchestrationConflict("version-0 attempt cannot be evaluated")
+            if row.state == AttemptState.EVALUATED:
+                return self._aggregate(job, execution, items, now)
+            if row.state != AttemptState.RESPONSE_RECEIVED or item.status != "running":
+                raise OrchestrationConflict("attempt is not awaiting evaluation")
+
+            baseline_version = None
+            baseline_activation_id = None
+            baseline_id = None
+            policy_fingerprint = None
+            if result.baseline_state in {BaselineState.COMPATIBLE, BaselineState.INCOMPATIBLE}:
+                if item.baseline_activation_id is None or item.baseline_id is None:
+                    raise OrchestrationConflict("baseline comparison pin is missing")
+                baseline = session.scalar(
+                    select(BaselineRow).where(
+                        BaselineRow.id == item.baseline_id,
+                        BaselineRow.test_case_id == item.test_case_id,
+                        BaselineRow.environment_id == execution.environment_id,
+                        BaselineRow.project_id == item.project_id,
+                    )
+                )
+                if baseline is None:
+                    raise OrchestrationConflict("baseline comparison candidate is missing")
+                baseline_activation_id = item.baseline_activation_id
+                baseline_id = item.baseline_id
+                baseline_version = baseline.version
+                policy_fingerprint = baseline.policy_fingerprint
+
+            comparison_state = cast(
+                Literal["not_requested", "missing", "incompatible", "compatible"],
+                {
+                    BaselineState.NOT_REQUESTED: "not_requested",
+                    BaselineState.MISSING: "missing",
+                    BaselineState.INCOMPATIBLE: "incompatible",
+                    BaselineState.COMPATIBLE: "compatible",
+                }[result.baseline_state],
+            )
+            comparison = BaselineComparisonInput(
+                state=comparison_state,
+                baseline_activation_id=baseline_activation_id,
+                baseline_id=baseline_id,
+                baseline_version=baseline_version,
+                policy_fingerprint=policy_fingerprint,
+                checked_at=now,
+            )
+            evaluations = tuple(
+                EvaluationInput(
+                    id=evaluation_id,
+                    ordinal=evaluation.ordinal,
+                    kind=evaluation.kind.value,
+                    rule_id=UUID(evaluation.rule_id) if evaluation.rule_id is not None else None,
+                    severity=evaluation.severity.value,
+                    outcome=evaluation.outcome.value,
+                    message_code=evaluation.message_code.value,
+                    expected=BoundedEvidence(evaluation.expected, evaluation.evidence_omitted),
+                    actual=BoundedEvidence(evaluation.actual, evaluation.evidence_omitted),
+                    created_at=now,
+                )
+                for evaluation_id, evaluation in zip(
+                    evaluation_ids, result.evaluations, strict=True
+                )
+            )
+            PostgresEvaluationPersistence.add_result(
+                session,
+                attempt_id=attempt_id,
+                comparison=comparison,
+                evaluations=evaluations,
+            )
+            row.state = AttemptState.EVALUATED
+            row.verdict = result.verdict.value
+            row.evaluation_error_code = None
+            self._finish_item(item, "completed", result.verdict.value, now)
+            return self._aggregate(job, execution, items, now)
+
+    def fail_evaluation(self, attempt_id: UUID, lease: Lease) -> None:
+        with self._transaction() as session:
+            job, execution, items, now = self._lock_execution(session, lease)
+            self._require_running(execution)
+            item, row = self._lock_attempt(session, items, attempt_id)
+            if row.state == AttemptState.FAILED and row.evaluation_error_code == (
+                "platform_evaluation_failure"
+            ):
+                return
+            if row.result_contract_version != 1 or row.state != AttemptState.RESPONSE_RECEIVED:
+                raise OrchestrationConflict("attempt is not awaiting evaluation failure")
+            row.state = AttemptState.FAILED
+            row.verdict = Verdict.INCONCLUSIVE.value
+            row.evaluation_error_code = "platform_evaluation_failure"
+            row.finished_at = now
+            self._finish_item(item, "failed", Verdict.INCONCLUSIVE.value, now)
+            for remaining in items:
+                if remaining.ordinal > item.ordinal and remaining.status == "pending":
+                    self._finish_item(remaining, "skipped", "not_evaluated", now)
+            execution.status = "failed"
+            execution.verdict = Verdict.INCONCLUSIVE.value
+            execution.finished_at = now
+            job.state = JobState.DEAD
+            job.last_error_code = ErrorCode.HANDLER_FAILED
+            job.finished_at = now
+            job.lease_owner = None
+            job.lease_token = None
+            job.lease_expires_at = None
 
     def schedule_replay(
         self, attempt_id: UUID, lease: Lease, *, successor_id: UUID
@@ -497,10 +706,13 @@ class PostgresOrchestrationStore:
     ) -> bool:
         if any(item.status not in _TERMINAL_ITEM_STATES for item in items):
             return False
-        verdict = (
-            "inconclusive"
-            if any(item.verdict == "inconclusive" for item in items)
-            else "not_evaluated"
+        verdict = next(
+            (
+                candidate
+                for candidate in _VERDICT_PRECEDENCE
+                if any(item.verdict == candidate for item in items)
+            ),
+            "not_evaluated",
         )
         self._succeed(job, execution, verdict, now)
         return True

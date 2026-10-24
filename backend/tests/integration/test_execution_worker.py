@@ -75,7 +75,7 @@ async def test_worker_consumes_execute_execution_and_does_not_double_complete(
     assert job is not None and job.state == "succeeded"
     with Session(engine) as session:
         attempts = list(session.scalars(select(TestAttemptRow)))
-    assert len(attempts) == 1 and attempts[0].state == "response_received"
+    assert len(attempts) == 1 and attempts[0].state == "evaluated"
 
 
 async def test_heartbeat_loss_discards_in_memory_transport_result(
