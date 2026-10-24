@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from alembic.command import downgrade, upgrade
 from alembic.config import Config
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DatabaseError, IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -27,8 +27,10 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
+    TraceReferenceRow,
 )
 from sentinel.persistence.queue import PostgresJobStore
+from sentinel.persistence.trace_references import TraceReferenceRepository
 
 pytestmark = pytest.mark.integration
 NOW = datetime(2030, 1, 1, tzinfo=UTC)
@@ -481,6 +483,240 @@ def test_expired_lease_cannot_commit_attempt_outcome(
     with Session(engine) as session:
         row = session.get(TestAttemptRow, attempt.id)
         assert row is not None and row.state == "prepared"
+
+
+def test_m5_primary_reference_and_correlation_job_are_atomic_and_idempotent(
+    engine: Engine, seeded_attempt_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    queue = PostgresJobStore(factory, clock=lambda: NOW)
+    lease = queue.claim(uuid4(), 60)
+    assert lease is not None
+    attempts = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    attempts.checkpoint_dispatch(
+        attempt.id, lease, fingerprint="a" * 64, trace_id="b" * 32, span_id="c" * 16
+    )
+    attempts.record_response(
+        attempt.id,
+        lease,
+        ResponseArtifact(
+            attempt.id,
+            200,
+            {},
+            "text",
+            "ok",
+            2,
+            False,
+            False,
+            NOW,
+            NOW + timedelta(days=1),
+        ),
+        outcome=TransportOutcome.RESPONSE_RECEIVED,
+    )
+    with Session(engine) as session:
+        reference = session.scalar(
+            select(TraceReferenceRow).where(TraceReferenceRow.attempt_id == attempt.id)
+        )
+        assert reference is not None and reference.relation == "primary"
+        assert (
+            session.scalar(
+                select(func.count(JobRow.id)).where(JobRow.trace_reference_id == reference.id)
+            )
+            == 1
+        )
+
+        execution = session.get(ExecutionRow, lease.subject_id)
+        assert execution is not None and execution.status == "queued"
+
+    # Reconciliation queue completion is fenced but never an execution transition.
+    correlation = queue.claim(uuid4(), 60)
+    assert correlation is not None and correlation.trace_reference_id == reference.id
+    queue.start(correlation)
+    queue.complete(correlation)
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, lease.subject_id)
+        assert execution is not None and execution.status == "queued"
+
+    # Repeating the terminal checkpoint is idempotent.
+    with factory.begin() as session:
+        reference = session.scalar(
+            select(TraceReferenceRow).where(TraceReferenceRow.attempt_id == attempt.id)
+        )
+        assert reference is not None
+        primary_id = reference.id
+        persisted_attempt = session.get(TestAttemptRow, attempt.id)
+        assert persisted_attempt is not None
+        TraceReferenceRepository.finalize_primary(
+            session,
+            attempt=persisted_attempt,
+            terminal_at=NOW,
+            execution_id=lease.subject_id,
+        )
+    with Session(engine) as session:
+        assert (
+            session.scalar(
+                select(func.count(JobRow.id)).where(JobRow.trace_reference_id == primary_id)
+            )
+            == 1
+        )
+
+    # A rolled-back terminal checkpoint leaves no durable correlation job.
+    second = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    attempts.checkpoint_dispatch(
+        second.id, lease, fingerprint="d" * 64, trace_id="e" * 32, span_id="f" * 16
+    )
+    with pytest.raises(RuntimeError):
+        with factory.begin() as session:
+            reference = session.scalar(
+                select(TraceReferenceRow)
+                .where(TraceReferenceRow.attempt_id == second.id)
+                .with_for_update()
+            )
+            assert reference is not None
+            second_id = reference.id
+            persisted_attempt = session.get(TestAttemptRow, second.id)
+            assert persisted_attempt is not None
+            TraceReferenceRepository.finalize_primary(
+                session,
+                attempt=persisted_attempt,
+                terminal_at=NOW,
+                execution_id=lease.subject_id,
+            )
+            raise RuntimeError("rollback probe")
+    with Session(engine) as session:
+        assert (
+            session.scalar(
+                select(func.count(JobRow.id)).where(JobRow.trace_reference_id == second_id)
+            )
+            == 0
+        )
+
+
+def test_m5_scoped_reference_and_evidence_constraints_reject_cross_project_and_raw_data(
+    engine: Engine, seeded_attempt_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    queue = PostgresJobStore(factory, clock=lambda: NOW)
+    lease = queue.claim(uuid4(), 60)
+    assert lease is not None
+    attempts = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    attempts.checkpoint_dispatch(
+        attempt.id, lease, fingerprint="a" * 64, trace_id="b" * 32, span_id="c" * 16
+    )
+    with Session(engine) as session:
+        item = session.get(ExecutionItemRow, item_id)
+        assert item is not None
+        with pytest.raises(IntegrityError):
+            with session.begin_nested():
+                session.add(
+                    TraceReferenceRow(
+                        id=uuid4(),
+                        attempt_id=attempt.id,
+                        execution_item_id=item.id,
+                        execution_id=lease.subject_id,
+                        project_id=uuid4(),
+                        relation="linked",
+                        trace_id="d" * 32,
+                        correlation_source="baggage_attribute_search",
+                        status="pending",
+                        deadline_at=NOW,
+                        lookup_attempt_count=0,
+                        evidence_schema_version=1,
+                        created_at=NOW,
+                        updated_at=NOW,
+                    )
+                )
+                session.flush()
+        with pytest.raises(IntegrityError):
+            with session.begin_nested():
+                session.add(
+                    TraceReferenceRow(
+                        id=uuid4(),
+                        attempt_id=attempt.id,
+                        execution_item_id=item.id,
+                        execution_id=lease.subject_id,
+                        project_id=item.project_id,
+                        relation="linked",
+                        trace_id="d" * 32,
+                        correlation_source="baggage_attribute_search",
+                        status="pending",
+                        deadline_at=NOW,
+                        lookup_attempt_count=0,
+                        evidence_schema_version=1,
+                        evidence_json={"schema_version": 1, "services": "x" * 70000},
+                        created_at=NOW,
+                        updated_at=NOW,
+                    )
+                )
+                session.flush()
+
+
+def test_m5_migration_round_trip_preserves_legacy_attempt_without_backfill(
+    engine: Engine,
+    seeded_attempt_catalog: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_url = engine.url.render_as_string(hide_password=False)
+    monkeypatch.setenv("SENTINEL_DATABASE_URL", database_url)
+    config = Config(str(Path(__file__).parents[2] / "alembic.ini"))
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    legacy = PostgresAttemptStore(factory, clock=lambda: NOW).create_prepared(
+        item_id, attempt_id=uuid4(), now=NOW
+    )
+    try:
+        downgrade(config, "0010")
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT to_regclass('trace_references')")) is None
+        upgrade(config, "head")
+        with Session(engine) as session:
+            assert session.get(TestAttemptRow, legacy.id) is not None
+            assert (
+                session.scalar(
+                    select(func.count(TraceReferenceRow.id)).where(
+                        TraceReferenceRow.attempt_id == legacy.id
+                    )
+                )
+                == 0
+            )
+    finally:
+        upgrade(config, "head")
+
+
+def test_m5_correlation_recovery_fences_stale_delivery_without_replay(
+    engine: Engine, seeded_attempt_catalog: None
+) -> None:
+    factory = sessionmaker(engine, expire_on_commit=False)
+    item_id, _ = _execution_with_job(factory)
+    clock = [NOW]
+    queue = PostgresJobStore(factory, clock=lambda: clock[0])
+    lease = queue.claim(uuid4(), 60)
+    assert lease is not None
+    attempts = PostgresAttemptStore(factory, clock=lambda: NOW)
+    attempt = attempts.create_prepared(item_id, attempt_id=uuid4(), now=NOW)
+    attempts.checkpoint_dispatch(
+        attempt.id, lease, fingerprint="a" * 64, trace_id="b" * 32, span_id="c" * 16
+    )
+    attempts.record_transport_failure(
+        attempt.id,
+        lease,
+        outcome=TransportOutcome.TOTAL_TIMEOUT,
+        certainty=DispatchCertainty.POSSIBLY_SENT,
+    )
+    correlation = queue.claim(uuid4(), 60)
+    assert correlation is not None
+    clock[0] = NOW + timedelta(seconds=61)
+    with pytest.raises(LeaseLost):
+        queue.complete(correlation)
+    recovered = queue.claim(uuid4(), 60)
+    assert recovered is not None and recovered.delivery_count == 2
+    with Session(engine) as session:
+        execution = session.get(ExecutionRow, lease.subject_id)
+        assert execution is not None and execution.status == "queued"
 
 
 def test_not_sent_requires_positive_phase_proof(

@@ -70,7 +70,12 @@ async def test_worker_consumes_execute_execution_and_does_not_double_complete(
 
     with Session(engine) as session:
         execution = session.get(ExecutionRow, execution_id)
-        job = session.scalar(select(JobRow).where(JobRow.subject_id == execution_id))
+        job = session.scalar(
+            select(JobRow).where(
+                JobRow.subject_id == execution_id,
+                JobRow.kind == "execute_execution",
+            )
+        )
     assert execution is not None and execution.status == "completed"
     assert job is not None and job.state == "succeeded"
     with Session(engine) as session:

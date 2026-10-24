@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,7 +17,13 @@ from sentinel.execution.domain import (
     validate_transition,
 )
 from sentinel.execution.ports import IdFactory
-from sentinel.persistence.models import ExecutionItemRow, ExecutionRow, JobRow, TestAttemptRow
+from sentinel.persistence.models import (
+    ExecutionItemRow,
+    ExecutionRow,
+    JobRow,
+    TestAttemptRow,
+    TraceReferenceRow,
+)
 
 
 class PostgresJobStore:
@@ -85,7 +91,13 @@ class PostgresJobStore:
                             and_(JobRow.state == "leased", JobRow.lease_expires_at <= now),
                         )
                     )
-                    .order_by(JobRow.available_at, JobRow.created_at, JobRow.id)
+                    # Preserve execution recovery priority while correlation work is additive.
+                    .order_by(
+                        case((JobRow.kind == "correlate_trace", 1), else_=0),
+                        JobRow.available_at,
+                        JobRow.created_at,
+                        JobRow.id,
+                    )
                     .with_for_update(skip_locked=True)
                     .limit(1)
                 )
@@ -112,6 +124,7 @@ class PostgresJobStore:
                     row.lease_token,
                     row.lease_expires_at,
                     row.delivery_count,
+                    row.trace_reference_id,
                 )
                 return lease
         return None
@@ -142,6 +155,9 @@ class PostgresJobStore:
     def start(self, lease: Lease) -> None:
         with self._transaction() as session:
             row, now = self._owned(session, lease)
+            if row.kind == "correlate_trace":
+                self._validate_correlation(session, row)
+                return
             execution = self._subject(session, row)
             if execution.status == "queued":
                 execution.status = "running"
@@ -152,6 +168,13 @@ class PostgresJobStore:
     def complete(self, lease: Lease) -> None:
         with self._transaction() as session:
             row, now = self._owned(session, lease)
+            if row.kind == "correlate_trace":
+                self._validate_correlation(session, row)
+                validate_transition(JobState(row.state), JobState.SUCCEEDED)
+                row.state = JobState.SUCCEEDED
+                row.finished_at = now
+                self._clear_lease(row)
+                return
             execution = self._subject(session, row)
             if execution.status != "running":
                 raise ValueError("only a running execution can complete")
@@ -183,12 +206,32 @@ class PostgresJobStore:
             raise RuntimeError("missing execution subject")
         return execution
 
+    @staticmethod
+    def _validate_correlation(session: Session, row: JobRow) -> TraceReferenceRow:
+        if row.trace_reference_id is None:
+            raise LeaseLost("correlation job has no trace reference")
+        reference = session.scalar(
+            select(TraceReferenceRow)
+            .where(
+                TraceReferenceRow.id == row.trace_reference_id,
+                TraceReferenceRow.execution_id == row.subject_id,
+                TraceReferenceRow.relation == "primary",
+            )
+            .with_for_update()
+        )
+        if reference is None:
+            raise LeaseLost("correlation reference is invalid")
+        return reference
+
     def _dead(self, session: Session, row: JobRow, code: ErrorCode, now: datetime) -> None:
         validate_transition(JobState(row.state), JobState.DEAD)
         row.state = JobState.DEAD
         row.last_error_code = code
         row.finished_at = now
         self._clear_lease(row)
+        if row.kind == "correlate_trace":
+            self._validate_correlation(session, row)
+            return
         execution = self._subject(session, row)
         if self._fail_pending_evaluation(session, execution, now):
             return

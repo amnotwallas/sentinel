@@ -29,6 +29,7 @@ from sentinel.persistence.models import (
     TestAttemptRow,
     TestCaseRevisionRow,
     TestCaseRow,
+    TraceReferenceRow,
 )
 from sentinel.persistence.queue import PostgresJobStore
 
@@ -71,6 +72,7 @@ def engine() -> Iterator[Engine]:
         conn.execute(delete(EvaluationRow))
         conn.execute(delete(BaselineComparisonRow))
         conn.execute(delete(ResponseArtifactRow))
+        conn.execute(delete(TraceReferenceRow))
         conn.execute(delete(TestAttemptRow))
         conn.execute(delete(ExecutionItemRow))
         conn.execute(delete(BaselineActivationRow))

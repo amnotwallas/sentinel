@@ -30,6 +30,7 @@ from sentinel.persistence.models import (
     ResponseArtifactRow,
     TestAttemptRow,
 )
+from sentinel.persistence.trace_references import TraceReferenceRepository
 
 
 class AttemptNotFound(LookupError):
@@ -157,6 +158,7 @@ class PostgresAttemptStore:
         now = self._now(session)
         if (
             job is None
+            or job.kind != "execute_execution"
             or job.subject_id != lease.subject_id
             or job.lease_expires_at is None
             or job.lease_expires_at <= now
@@ -192,6 +194,25 @@ class PostgresAttemptStore:
         return row, now
 
     @staticmethod
+    def _trace_context(
+        session: Session, row: TestAttemptRow, execution_id: UUID
+    ) -> tuple[ExecutionItemRow, ExecutionRow]:
+        item = session.scalar(
+            select(ExecutionItemRow)
+            .where(
+                ExecutionItemRow.id == row.execution_item_id,
+                ExecutionItemRow.execution_id == execution_id,
+            )
+            .with_for_update()
+        )
+        execution = session.scalar(
+            select(ExecutionRow).where(ExecutionRow.id == execution_id).with_for_update()
+        )
+        if item is None or execution is None:
+            raise LeaseLost("attempt is outside leased execution")
+        return item, execution
+
+    @staticmethod
     def _set_dispatch(
         row: TestAttemptRow, *, fingerprint: str, trace_id: str, span_id: str, now: datetime
     ) -> None:
@@ -219,6 +240,16 @@ class PostgresAttemptStore:
             row, now = self._owned(session, attempt_id, lease)
             self._set_dispatch(
                 row, fingerprint=fingerprint, trace_id=trace_id, span_id=span_id, now=now
+            )
+            item, execution = self._trace_context(session, row, lease.subject_id)
+            TraceReferenceRepository.create_primary(
+                session,
+                attempt=row,
+                item=item,
+                execution=execution,
+                trace_id=trace_id,
+                span_id=span_id,
+                now=now,
             )
             return self._record(row)
 
@@ -280,6 +311,10 @@ class PostgresAttemptStore:
             row.response_recorded_at = artifact.recorded_at
             row.finished_at = now
             row.duration_ms = max(0, int((now - row.created_at).total_seconds() * 1000))
+            _item, execution = self._trace_context(session, row, lease.subject_id)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             return self._record(row)
 
     def record_transport_failure(
@@ -376,4 +411,8 @@ class PostgresAttemptStore:
             row.redirect_rejection_code = redirect_code
             row.finished_at = now
             row.duration_ms = max(0, int((now - row.created_at).total_seconds() * 1000))
+            _item, execution = self._trace_context(session, row, lease.subject_id)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             return self._record(row)

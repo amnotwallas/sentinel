@@ -134,6 +134,7 @@ class Lease:
     token: UUID
     expires_at: datetime
     delivery_count: int
+    trace_reference_id: UUID | None = None
 
 
 @dataclass(frozen=True)

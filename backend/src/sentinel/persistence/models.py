@@ -397,6 +397,9 @@ class ExecutionItemRow(Base):
         UniqueConstraint("execution_id", "ordinal", name="uq_execution_items_execution_ordinal"),
         UniqueConstraint("execution_id", "test_case_id", name="uq_execution_items_execution_case"),
         UniqueConstraint(
+            "id", "execution_id", "project_id", name="uq_execution_items_identity_scope"
+        ),
+        UniqueConstraint(
             "id",
             "result_contract_version",
             name="uq_execution_items_identity_contract_version",
@@ -588,6 +591,7 @@ class TestAttemptRow(Base):
             name="fk_test_attempts_replay_successor",
         ),
         UniqueConstraint("execution_item_id", "sequence", name="uq_test_attempts_item_sequence"),
+        UniqueConstraint("id", "execution_item_id", name="uq_test_attempts_identity_item"),
         UniqueConstraint("replay_successor_id", name="uq_test_attempts_replay_successor"),
         Index("ix_test_attempts_item_state", "execution_item_id", "state", "sequence"),
         Index(
@@ -952,6 +956,106 @@ class IdempotencyRecordRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class TraceReferenceRow(Base):
+    __tablename__ = "trace_references"
+    __table_args__ = (
+        CheckConstraint("relation IN ('primary','linked')", name="trace_reference_relation"),
+        CheckConstraint(
+            "trace_id ~ '^[0-9a-f]{32}$' AND trace_id !~ '^0+$'",
+            name="trace_reference_trace_id",
+        ),
+        CheckConstraint(
+            "span_id IS NULL OR (span_id ~ '^[0-9a-f]{16}$' AND span_id !~ '^0+$')",
+            name="trace_reference_span_id",
+        ),
+        CheckConstraint(
+            "(relation = 'primary' AND span_id IS NOT NULL "
+            "AND correlation_source = 'sentinel_context') OR "
+            "(relation = 'linked' AND correlation_source = 'baggage_attribute_search')",
+            name="trace_reference_relation_shape",
+        ),
+        CheckConstraint(
+            "status IN ('pending','missing','available','partial','tempo_unavailable','expired')",
+            name="trace_reference_status",
+        ),
+        CheckConstraint(
+            "lookup_attempt_count BETWEEN 0 AND 7", name="trace_reference_lookup_attempt_count"
+        ),
+        CheckConstraint(
+            "last_error_code IS NULL OR last_error_code IN ('not_found','unavailable','timeout',"
+            "'bad_response','oversized_response','unsupported','transport_error','invalid_trace',"
+            "'correlation_delivery_exhausted')",
+            name="trace_reference_error_code",
+        ),
+        CheckConstraint(
+            "evidence_schema_version = 1 AND (evidence_json IS NULL OR "
+            "(jsonb_typeof(evidence_json) = 'object' AND evidence_json ? 'schema_version' "
+            "AND evidence_json ->> 'schema_version' = '1' "
+            "AND (evidence_json - ARRAY['schema_version','primary_span_found',"
+            "'trace_span_count','error_span_count','services','deployments',"
+            "'linked_match_count','context_continuity','comparison_anchor']) = '{}'::jsonb "
+            "AND octet_length(evidence_json::text) <= 65536))",
+            name="trace_reference_evidence_shape",
+        ),
+        ForeignKeyConstraint(
+            ["attempt_id", "execution_item_id"],
+            ["test_attempts.id", "test_attempts.execution_item_id"],
+            ondelete="CASCADE",
+            name="fk_trace_references_attempt_item",
+        ),
+        ForeignKeyConstraint(
+            ["execution_item_id", "execution_id", "project_id"],
+            ["execution_items.id", "execution_items.execution_id", "execution_items.project_id"],
+            ondelete="CASCADE",
+            name="fk_trace_references_item_scope",
+        ),
+        ForeignKeyConstraint(
+            ["execution_id", "project_id"],
+            ["executions.id", "executions.project_id"],
+            ondelete="CASCADE",
+            name="fk_trace_references_execution_scope",
+        ),
+        UniqueConstraint("id", "execution_id", name="uq_trace_references_identity_execution"),
+        Index("ix_trace_references_attempt", "attempt_id", "relation", "created_at", "id"),
+        Index("ix_trace_references_due", "status", "deadline_at", "updated_at"),
+        Index("ix_trace_references_trace", "trace_id", "created_at"),
+        Index(
+            "uq_trace_references_primary_attempt",
+            "attempt_id",
+            unique=True,
+            postgresql_where=text("relation = 'primary'"),
+        ),
+        Index(
+            "uq_trace_references_linked_identity",
+            "attempt_id",
+            "relation",
+            "trace_id",
+            unique=True,
+            postgresql_where=text("relation = 'linked'"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    attempt_id: Mapped[UUID]
+    execution_item_id: Mapped[UUID]
+    execution_id: Mapped[UUID]
+    project_id: Mapped[UUID]
+    relation: Mapped[str] = mapped_column(String(16))
+    trace_id: Mapped[str] = mapped_column(String(32))
+    span_id: Mapped[str | None] = mapped_column(String(16))
+    correlation_source: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(24))
+    first_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deadline_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lookup_attempt_count: Mapped[int] = mapped_column(Integer)
+    last_error_code: Mapped[str | None] = mapped_column(String(64))
+    evidence_schema_version: Mapped[int] = mapped_column(SmallInteger)
+    evidence_json: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class JobRow(Base):
     __tablename__ = "jobs"
     __table_args__ = (
@@ -967,14 +1071,28 @@ class JobRow(Base):
         CheckConstraint(
             "(state IN ('succeeded','dead')) = (finished_at IS NOT NULL)", name="job_terminal_time"
         ),
+        CheckConstraint(
+            "(kind = 'correlate_trace' AND trace_reference_id IS NOT NULL) OR "
+            "(kind <> 'correlate_trace' AND trace_reference_id IS NULL)",
+            name="job_trace_reference_shape",
+        ),
+        ForeignKeyConstraint(
+            ["trace_reference_id", "subject_id"],
+            ["trace_references.id", "trace_references.execution_id"],
+            ondelete="CASCADE",
+            name="fk_jobs_trace_reference_execution",
+        ),
+        UniqueConstraint("trace_reference_id", name="uq_jobs_trace_reference"),
         Index("ix_jobs_pending", "state", "available_at", "created_at"),
         Index("ix_jobs_expired", "state", "lease_expires_at"),
         Index("ix_jobs_subject", "subject_id"),
+        Index("ix_jobs_trace_reference", "trace_reference_id"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String(64))
     # The only M1 subject is an execution; later kinds require a reviewed migration.
     subject_id: Mapped[UUID] = mapped_column(ForeignKey("executions.id", ondelete="RESTRICT"))
+    trace_reference_id: Mapped[UUID | None]
     state: Mapped[str] = mapped_column(String(16))
     available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     lease_owner: Mapped[UUID | None]

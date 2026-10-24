@@ -794,7 +794,8 @@ def test_delivery_exhaustion_fails_pending_v1_evaluation_atomically(
     )
 
     clock.advance(60)
-    assert jobs.claim(uuid4(), 60) is None
+    correlation_lease = jobs.claim(uuid4(), 60)
+    assert correlation_lease is not None and correlation_lease.kind == "correlate_trace"
 
     with Session(engine) as session:
         execution_row = session.get(ExecutionRow, execution.id)
@@ -808,7 +809,12 @@ def test_delivery_exhaustion_fails_pending_v1_evaluation_atomically(
             if item is not None
             else None
         )
-        job = session.scalar(select(JobRow).where(JobRow.subject_id == execution.id))
+        job = session.scalar(
+            select(JobRow).where(
+                JobRow.subject_id == execution.id,
+                JobRow.kind == "execute_execution",
+            )
+        )
         comparison_count = session.scalar(
             select(func.count(BaselineComparisonRow.attempt_id)).where(
                 BaselineComparisonRow.attempt_id == attempt.id

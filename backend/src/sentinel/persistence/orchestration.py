@@ -45,6 +45,7 @@ from sentinel.persistence.regression import (
     EvaluationInput,
     PostgresEvaluationPersistence,
 )
+from sentinel.persistence.trace_references import TraceReferenceRepository
 from sentinel.regression.evaluator import (
     BaselineCandidate,
     BaselineState,
@@ -352,6 +353,15 @@ class PostgresOrchestrationStore:
                 span_id=span_id,
                 now=now,
             )
+            TraceReferenceRepository.create_primary(
+                session,
+                attempt=row,
+                item=item,
+                execution=execution,
+                trace_id=trace_id,
+                span_id=span_id,
+                now=now,
+            )
             return self._attempt(row)
 
     def fail_preparation(self, attempt_id: UUID, lease: Lease, code: PreparationErrorCode) -> bool:
@@ -398,6 +408,9 @@ class PostgresOrchestrationStore:
             row.response_recorded_at = artifact.recorded_at
             row.finished_at = now
             row.duration_ms = self._duration(row, now)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             if row.result_contract_version == 0:
                 self._finish_item(item, "completed", "not_evaluated", now)
             return self._aggregate(job, execution, items, now)
@@ -442,6 +455,9 @@ class PostgresOrchestrationStore:
                 self._finish_item(item, "failed", "not_evaluated", now)
             else:
                 self._finish_item(item, "completed", "inconclusive", now)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             return self._aggregate(job, execution, items, now)
 
     def persist_evaluation(
@@ -602,6 +618,9 @@ class PostgresOrchestrationStore:
             predecessor.included_in_verdict = False
             predecessor.finished_at = now
             predecessor.duration_ms = self._duration(predecessor, now)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=predecessor, terminal_at=now, execution_id=execution.id
+            )
             session.flush()
             return self._attempt(successor)
 
@@ -615,6 +634,9 @@ class PostgresOrchestrationStore:
             row.transport_outcome = TransportOutcome.INDETERMINATE
             row.finished_at = now
             row.duration_ms = self._duration(row, now)
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             self._finish_item(item, "indeterminate", "inconclusive", now)
             for remaining in items:
                 if remaining.ordinal <= item.ordinal:
@@ -632,6 +654,9 @@ class PostgresOrchestrationStore:
             self._require_running(execution)
             item, row = self._lock_attempt(session, items, attempt_id)
             if item.status in _TERMINAL_ITEM_STATES:
+                TraceReferenceRepository.finalize_primary(
+                    session, attempt=row, terminal_at=now, execution_id=execution.id
+                )
                 return self._aggregate(job, execution, items, now)
             if item.status != "running":
                 raise OrchestrationConflict("item is not resumable")
@@ -653,6 +678,9 @@ class PostgresOrchestrationStore:
                 self._finish_item(item, "indeterminate", "inconclusive", now)
             else:
                 raise OrchestrationConflict("attempt is not terminal")
+            TraceReferenceRepository.finalize_primary(
+                session, attempt=row, terminal_at=now, execution_id=execution.id
+            )
             return self._aggregate(job, execution, items, now)
 
     def complete_execution(self, lease: Lease) -> None:
